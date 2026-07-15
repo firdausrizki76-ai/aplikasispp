@@ -10,7 +10,15 @@ export default function LaporanPage() {
   const [loading, setLoading] = useState(true);
   
   // Stats for cards
-  const [stats, setStats] = useState({ totalSD: 0, totalSMP: 0, totalSeragam: 0 });
+  const [stats, setStats] = useState({ 
+    totalSD: 0, 
+    totalSMP: 0, 
+    totalSeragam: 0,
+    studentsSD: 0,
+    studentsSMP: 0,
+    percentLunasSD: 0,
+    percentLunasSMP: 0
+  });
   
   // Date range filters
   const [startDate, setStartDate] = useState("");
@@ -56,19 +64,38 @@ export default function LaporanPage() {
       .gte('created_at', `${startDate}T00:00:00Z`)
       .lte('created_at', `${endDate}T23:59:59Z`);
 
-    let sdCount = 0;
-    let smpCount = 0;
+    // Get student counts
+    const { count: countSD } = await supabase.from('students').select('*', { count: 'exact', head: true })
+      .eq('status', 'aktif').ilike('grade_level', '%SD%');
+    const { count: countSMP } = await supabase.from('students').select('*', { count: 'exact', head: true })
+      .eq('status', 'aktif').ilike('grade_level', '%SMP%');
+
+    let sdBillsTotal = 0;
+    let smpBillsTotal = 0;
+    let sdBillsLunas = 0;
+    let smpBillsLunas = 0;
     
     (bills || []).forEach(b => {
       const gl = (b.students as any)?.grade_level?.toUpperCase() || "";
-      if (gl.includes("SD")) sdCount++;
-      else if (gl.includes("SMP")) smpCount++;
+      const isLunas = b.status?.toLowerCase() === 'lunas';
+      if (gl.includes("SD")) {
+        sdBillsTotal++;
+        if (isLunas) sdBillsLunas++;
+      }
+      else if (gl.includes("SMP")) {
+        smpBillsTotal++;
+        if (isLunas) smpBillsLunas++;
+      }
     });
 
     setStats({
-      totalSD: sdCount,
-      totalSMP: smpCount,
-      totalSeragam: sales?.length || 0
+      totalSD: sdBillsTotal,
+      totalSMP: smpBillsTotal,
+      totalSeragam: sales?.length || 0,
+      studentsSD: countSD || 0,
+      studentsSMP: countSMP || 0,
+      percentLunasSD: sdBillsTotal > 0 ? Math.round((sdBillsLunas / sdBillsTotal) * 100) : 0,
+      percentLunasSMP: smpBillsTotal > 0 ? Math.round((smpBillsLunas / smpBillsTotal) * 100) : 0
     });
 
     setLoading(false);
@@ -383,21 +410,55 @@ export default function LaporanPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant">
-          <h3 className="text-sm font-bold text-gray-500 uppercase">Aktivitas SD</h3>
-          <p className="text-3xl font-black text-primary mt-2">{loading ? '...' : stats.totalSD}</p>
-          <p className="text-xs text-gray-400 mt-1">Tagihan/Transaksi dalam periode ini</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {/* Siswa SD & Tunggakan */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-gray-500 uppercase">Siswa SD Aktif</h3>
+            <p className="text-3xl font-black text-primary mt-2">{loading ? '...' : stats.studentsSD}</p>
+            <p className="text-xs text-gray-400 mt-1">Total {loading ? '...' : stats.totalSD} tagihan dalam periode ini</p>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs font-semibold text-gray-500">Persentase Lunas</span>
+              <span className="text-xs font-bold text-green-600">{loading ? '...' : stats.percentLunasSD}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-green-500 h-2 rounded-full" style={{ width: `${stats.percentLunasSD}%` }}></div>
+            </div>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant">
-          <h3 className="text-sm font-bold text-gray-500 uppercase">Aktivitas SMP</h3>
-          <p className="text-3xl font-black text-secondary mt-2">{loading ? '...' : stats.totalSMP}</p>
-          <p className="text-xs text-gray-400 mt-1">Tagihan/Transaksi dalam periode ini</p>
+
+        {/* Siswa SMP & Tunggakan */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-gray-500 uppercase">Siswa SMP Aktif</h3>
+            <p className="text-3xl font-black text-secondary mt-2">{loading ? '...' : stats.studentsSMP}</p>
+            <p className="text-xs text-gray-400 mt-1">Total {loading ? '...' : stats.totalSMP} tagihan dalam periode ini</p>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs font-semibold text-gray-500">Persentase Lunas</span>
+              <span className="text-xs font-bold text-green-600">{loading ? '...' : stats.percentLunasSMP}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-green-500 h-2 rounded-full" style={{ width: `${stats.percentLunasSMP}%` }}></div>
+            </div>
+          </div>
         </div>
+
+        {/* Transaksi Seragam */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant">
           <h3 className="text-sm font-bold text-gray-500 uppercase">Aktivitas Seragam</h3>
           <p className="text-3xl font-black text-green-600 mt-2">{loading ? '...' : stats.totalSeragam}</p>
-          <p className="text-xs text-gray-400 mt-1">Transaksi penjualan seragam</p>
+          <p className="text-xs text-gray-400 mt-1">Transaksi penjualan seragam pada periode ini</p>
+        </div>
+
+        {/* Ringkasan Download */}
+        <div className="bg-gradient-to-br from-primary to-primary-container p-6 rounded-xl shadow-sm text-white flex flex-col justify-center items-center text-center">
+          <span className="material-symbols-outlined text-4xl mb-2 text-white/80">summarize</span>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white/90">Pusat Laporan</h3>
+          <p className="text-xs text-white/70 mt-2">Unduh laporan keuangan di bawah ini untuk analisis mendalam.</p>
         </div>
       </div>
       
