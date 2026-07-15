@@ -1,0 +1,56 @@
+'use client';
+
+import { useState } from 'react';
+import Sidebar from '@/components/Sidebar';
+
+export default function DashboardShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden relative">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - controlled by state on mobile, always visible on desktop */}
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 md:ml-64 h-full transition-all duration-300 relative">
+        {/* Running Text */}
+        <div className="bg-primary text-white py-1.5 px-4 text-sm font-medium z-10 w-full overflow-hidden flex whitespace-nowrap border-b border-blue-900 shadow-sm">
+          <div className="animate-marquee inline-block">
+            ✨ Selamat datang di Aplikasi Bayar SPP Pro! Sistem Manajemen Keuangan Sekolah Modern, Aman, Terintegrasi, dan Real-Time. ✨
+          </div>
+        </div>
+
+        {/* Mobile Header */}
+        <header className="md:hidden bg-primary text-on-primary h-16 flex items-center justify-between px-4 z-30 sticky top-0 shadow-md">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-on-primary">school</span>
+            <h1 className="font-headline-sm text-headline-sm font-bold">Bayar SPP Pro</h1>
+          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <span className="material-symbols-outlined">menu</span>
+          </button>
+        </header>
+
+        {/* Main Scrollable Content */}
+        <main className="flex-1 overflow-y-auto pt-6 pb-12 px-4 md:pt-8 md:px-10 max-w-container-max-width mx-auto w-full">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

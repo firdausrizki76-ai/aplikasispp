@@ -1,0 +1,486 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+export default function LaporanPage() {
+  const [loading, setLoading] = useState(true);
+  
+  // Stats for cards
+  const [stats, setStats] = useState({ totalSD: 0, totalSMP: 0, totalSeragam: 0 });
+  
+  // Date range filters
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  // Download Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">("excel");
+  const [downloadType, setDownloadType] = useState<"SD" | "SMP" | "SERAGAM_SD" | "SERAGAM_SMP">("SD");
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    // Set default to current year
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-12
+    
+    let startY = currentYear;
+    let endY = currentYear + 1;
+    if (currentMonth < 7) {
+      startY = currentYear - 1;
+      endY = currentYear;
+    }
+
+    setStartDate(`${startY}-07-01`);
+    setEndDate(`${endY}-06-30`);
+  }, []);
+
+  const fetchData = async () => {
+    if (!startDate || !endDate) return;
+    
+    setLoading(true);
+    const supabase = createClient();
+    
+    // Just fetch some basic stats to show on the dashboard UI based on dates
+    const { data: bills } = await supabase.from('student_bills')
+      .select('*, students!inner(grade_level)')
+      .gte('created_at', `${startDate}T00:00:00Z`)
+      .lte('created_at', `${endDate}T23:59:59Z`);
+      
+    const { data: sales } = await supabase.from('sales')
+      .select('*')
+      .gte('created_at', `${startDate}T00:00:00Z`)
+      .lte('created_at', `${endDate}T23:59:59Z`);
+
+    let sdCount = 0;
+    let smpCount = 0;
+    
+    (bills || []).forEach(b => {
+      const gl = (b.students as any)?.grade_level?.toUpperCase() || "";
+      if (gl.includes("SD")) sdCount++;
+      else if (gl.includes("SMP")) smpCount++;
+    });
+
+    setStats({
+      totalSD: sdCount,
+      totalSMP: smpCount,
+      totalSeragam: sales?.length || 0
+    });
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [startDate, endDate]);
+
+  const setTahunAjaranIni = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+    let startY = currentYear;
+    let endY = currentYear + 1;
+    if (currentMonth < 7) {
+      startY = currentYear - 1;
+      endY = currentYear;
+    }
+    setStartDate(`${startY}-07-01`);
+    setEndDate(`${endY}-06-30`);
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      if (downloadType === "SERAGAM_SD" || downloadType === "SERAGAM_SMP") {
+        await generateSeragamReport(downloadType === "SERAGAM_SD" ? "SD" : "SMP");
+      } else {
+        await generateSekolahReport(downloadType);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat membuat laporan.");
+    } finally {
+      setDownloading(false);
+      setIsModalOpen(false);
+    }
+  };
+
+  const generateSekolahReport = async (jenjang: "SD" | "SMP") => {
+    const supabase = createClient();
+    
+    // Fetch all required data
+    const { data: students } = await supabase.from('students')
+      .select('id, name, classes!inner(class_name, grade_level)')
+      .eq('classes.grade_level', jenjang)
+      .order('name');
+      
+    const { data: bills } = await supabase.from('student_bills')
+      .select('*, payment_transactions(payment_date)')
+      .gte('created_at', `${startDate}T00:00:00Z`)
+      .lte('created_at', `${endDate}T23:59:59Z`);
+
+    const { data: master } = await supabase.from('master_tagihan').select('nama_tagihan');
+    
+    const tagihanTypes = (master || []).map(m => m.nama_tagihan).filter(t => t.toLowerCase() !== 'uang psb');
+    
+    // Unique months present in the bills
+    const monthsSet = new Set<string>();
+    (bills || []).forEach(b => {
+      if (b.bulan_tagihan) monthsSet.add(b.bulan_tagihan);
+    });
+    
+    // Define chronological sorting for Indonesian months
+    const monthOrder = ["Juli", "Agustus", "September", "Oktober", "November", "Desember", "Januari", "Februari", "Maret", "April", "Mei", "Juni"];
+    const sortedMonths = Array.from(monthsSet).sort((a, b) => {
+      const mA = a.split(" ")[0];
+      const mB = b.split(" ")[0];
+      return monthOrder.indexOf(mA) - monthOrder.indexOf(mB);
+    });
+
+    if (downloadFormat === "excel") {
+      generateSekolahExcel(jenjang, students || [], bills || [], sortedMonths, tagihanTypes);
+    } else {
+      generateSekolahPDF(jenjang, students || [], bills || [], sortedMonths, tagihanTypes);
+    }
+  };
+
+  const generateSekolahExcel = (jenjang: string, students: any[], bills: any[], months: string[], tagihanTypes: string[]) => {
+    const wsData: any[][] = [];
+    
+    // Row 1: Title
+    wsData.push([`Rekap Pembayaran Sekolah: ${jenjang} T.A.`]);
+    
+    // Row 2: Headers (Months)
+    const row2 = ["No.", "Nama Siswa", "Kelas", "Uang PSB"];
+    months.forEach(m => {
+      row2.push(m);
+      for (let i = 1; i < tagihanTypes.length; i++) row2.push("");
+    });
+    wsData.push(row2);
+
+    // Row 3: Subheaders (Tagihan Types)
+    const row3 = ["", "", "", ""];
+    months.forEach(() => {
+      tagihanTypes.forEach(t => row3.push(t));
+    });
+    wsData.push(row3);
+
+    // Data Rows
+    students.forEach((s, idx) => {
+      const sBills = bills.filter(b => b.student_id === s.id && b.status?.toLowerCase() === 'lunas');
+      const psbBill = sBills.find(b => b.jenis_tagihan?.toLowerCase() === 'uang psb');
+      
+      const formatValue = (bill: any) => {
+        if (!bill) return "-";
+        const tx = Array.isArray(bill.payment_transactions) ? bill.payment_transactions[0] : bill.payment_transactions;
+        const dateStr = tx?.payment_date;
+        const dateFormatted = dateStr ? new Date(dateStr).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) : '';
+        return dateFormatted ? `${bill.nominal.toLocaleString('id-ID')} (Lunas ${dateFormatted})` : bill.nominal.toLocaleString('id-ID');
+      };
+
+      const rowData = [
+        idx + 1,
+        s.name,
+        (s.classes as any)?.class_name || "-",
+        formatValue(psbBill)
+      ];
+
+      months.forEach(m => {
+        const monthBills = sBills.filter(b => b.bulan_tagihan === m);
+        tagihanTypes.forEach(t => {
+          const bill = monthBills.find(b => b.jenis_tagihan === t);
+          rowData.push(formatValue(bill));
+        });
+      });
+      
+      wsData.push(rowData);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Merges
+    const merges = [];
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: row2.length - 1 } }); // Title
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 2, c: 0 } }); // No
+    merges.push({ s: { r: 1, c: 1 }, e: { r: 2, c: 1 } }); // Nama
+    merges.push({ s: { r: 1, c: 2 }, e: { r: 2, c: 2 } }); // Kelas
+    merges.push({ s: { r: 1, c: 3 }, e: { r: 2, c: 3 } }); // PSB
+    
+    let currentCol = 4;
+    months.forEach(() => {
+      merges.push({ s: { r: 1, c: currentCol }, e: { r: 1, c: currentCol + tagihanTypes.length - 1 } });
+      currentCol += tagihanTypes.length;
+    });
+    
+    ws['!merges'] = merges;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rekap");
+    XLSX.writeFile(wb, `Rekap_Pembayaran_${jenjang}.xlsx`);
+  };
+
+  const generateSekolahPDF = (jenjang: string, students: any[], bills: any[], months: string[], tagihanTypes: string[]) => {
+    const doc = new jsPDF('landscape');
+    
+    doc.setFontSize(16);
+    doc.text(`Rekap Pembayaran Sekolah: ${jenjang}`, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 22);
+
+    const head1 = ["No.", "Nama Siswa", "Kelas", "Uang PSB"];
+    const head2 = ["", "", "", ""];
+    
+    months.forEach(m => {
+      head1.push(m);
+      for (let i = 1; i < tagihanTypes.length; i++) head1.push("");
+      tagihanTypes.forEach(t => head2.push(t));
+    });
+
+    const body = students.map((s, idx) => {
+      const sBills = bills.filter(b => b.student_id === s.id && b.status?.toLowerCase() === 'lunas');
+      const psbBill = sBills.find(b => b.jenis_tagihan?.toLowerCase() === 'uang psb');
+      
+      const formatValue = (bill: any) => {
+        if (!bill) return "-";
+        const tx = Array.isArray(bill.payment_transactions) ? bill.payment_transactions[0] : bill.payment_transactions;
+        const dateStr = tx?.payment_date;
+        const dateFormatted = dateStr ? new Date(dateStr).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) : '';
+        return dateFormatted ? `${bill.nominal.toLocaleString('id-ID')} (Lunas ${dateFormatted})` : bill.nominal.toLocaleString('id-ID');
+      };
+      
+      const row = [
+        (idx + 1).toString(),
+        s.name,
+        (s.classes as any)?.class_name || "-",
+        formatValue(psbBill)
+      ];
+
+      months.forEach(m => {
+        const monthBills = sBills.filter(b => b.bulan_tagihan === m);
+        tagihanTypes.forEach(t => {
+          const bill = monthBills.find(b => b.jenis_tagihan === t);
+          row.push(formatValue(bill));
+        });
+      });
+      return row;
+    });
+
+    autoTable(doc, {
+      startY: 30,
+      head: [head1, head2],
+      body: body,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1 },
+      headStyles: { fillColor: [66, 139, 202], textColor: 255, halign: 'center' }
+    });
+
+    doc.save(`Rekap_Pembayaran_${jenjang}.pdf`);
+  };
+
+  const generateSeragamReport = async (jenjang: "SD" | "SMP") => {
+    const supabase = createClient();
+    const { data: salesRaw } = await supabase.from('sales').select('*, students(name, classes(grade_level))')
+      .gte('created_at', `${startDate}T00:00:00Z`)
+      .lte('created_at', `${endDate}T23:59:59Z`);
+
+    // Filter by jenjang
+    const sales = (salesRaw || []).filter(s => {
+      const gl = (s.students as any)?.classes?.grade_level || "";
+      return gl === jenjang;
+    });
+
+    if (downloadFormat === "excel") {
+      const wsData = [
+        [`Laporan Transaksi Seragam ${jenjang}`],
+        ["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)"]
+      ];
+      
+      (sales || []).forEach(s => {
+        const pembeli = s.buyer_name || (s.students as any)?.name || "Anonim";
+        wsData.push([
+          new Date(s.created_at).toLocaleDateString('id-ID'),
+          pembeli,
+          s.item_name || "-",
+          s.quantity,
+          s.total_price
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Seragam");
+      XLSX.writeFile(wb, `Laporan_Seragam_${jenjang}.xlsx`);
+    } else {
+      const doc = new jsPDF();
+      doc.text(`Laporan Transaksi Seragam ${jenjang}`, 14, 15);
+      doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 22);
+      
+      const body = (sales || []).map(s => {
+        const pembeli = s.buyer_name || (s.students as any)?.name || "Anonim";
+        return [
+          new Date(s.created_at).toLocaleDateString('id-ID'),
+          pembeli,
+          s.item_name || "-",
+          s.quantity,
+          s.total_price.toLocaleString('id-ID')
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 30,
+        head: [["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)"]],
+        body: body,
+        theme: 'grid'
+      });
+      doc.save(`Laporan_Seragam_${jenjang}.pdf`);
+    }
+  };
+
+  return (
+    <div className="view-section h-full flex flex-col">
+      <div className="mb-6 flex justify-between items-end">
+        <div>
+          <h2 className="font-headline-lg text-primary tracking-tight">Report Center Yayasan</h2>
+          <p className="font-body-lg text-on-surface-variant mt-1">Pusat unduhan dan analisis data keuangan sekolah.</p>
+        </div>
+        
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-primary text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all hover:bg-blue-700"
+        >
+          <span className="material-symbols-outlined">download</span> Download Laporan
+        </button>
+      </div>
+
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-outline-variant mb-6 flex flex-wrap gap-4 items-end">
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal Mulai</label>
+          <input 
+            type="date" 
+            value={startDate} 
+            onChange={e => setStartDate(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-40 text-sm focus:ring-2 focus:ring-primary outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal Akhir</label>
+          <input 
+            type="date" 
+            value={endDate} 
+            onChange={e => setEndDate(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-40 text-sm focus:ring-2 focus:ring-primary outline-none"
+          />
+        </div>
+        <button 
+          onClick={setTahunAjaranIni}
+          className="px-4 py-2 bg-secondary-container text-on-secondary-container font-semibold rounded-lg hover:bg-secondary-container/80 transition text-sm flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-[18px]">calendar_month</span> Tahun Ajaran Ini
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant">
+          <h3 className="text-sm font-bold text-gray-500 uppercase">Aktivitas SD</h3>
+          <p className="text-3xl font-black text-primary mt-2">{loading ? '...' : stats.totalSD}</p>
+          <p className="text-xs text-gray-400 mt-1">Tagihan/Transaksi dalam periode ini</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant">
+          <h3 className="text-sm font-bold text-gray-500 uppercase">Aktivitas SMP</h3>
+          <p className="text-3xl font-black text-secondary mt-2">{loading ? '...' : stats.totalSMP}</p>
+          <p className="text-xs text-gray-400 mt-1">Tagihan/Transaksi dalam periode ini</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant">
+          <h3 className="text-sm font-bold text-gray-500 uppercase">Aktivitas Seragam</h3>
+          <p className="text-3xl font-black text-green-600 mt-2">{loading ? '...' : stats.totalSeragam}</p>
+          <p className="text-xs text-gray-400 mt-1">Transaksi penjualan seragam</p>
+        </div>
+      </div>
+      
+      <div className="flex-1 bg-white rounded-xl shadow-sm border border-outline-variant flex items-center justify-center p-8 text-center text-gray-500">
+        <div>
+          <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">analytics</span>
+          <p className="text-lg font-medium text-gray-700">Data siap di-export</p>
+          <p className="text-sm mt-1 max-w-md mx-auto">Klik tombol <strong>Download Laporan</strong> di atas untuk menghasilkan laporan berformat Excel bersarang (Pivot) atau PDF sesuai periode yang Anda pilih.</p>
+        </div>
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in-up">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Download Laporan</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:bg-gray-100 rounded-full p-1">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Laporan</label>
+                <select 
+                  value={downloadType}
+                  onChange={e => setDownloadType(e.target.value as any)}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="SD">Rekap Pembayaran Sekolah: SD</option>
+                  <option value="SMP">Rekap Pembayaran Sekolah: SMP</option>
+                  <option value="SERAGAM_SD">Rekap Transaksi Seragam & Stok: SD</option>
+                  <option value="SERAGAM_SMP">Rekap Transaksi Seragam & Stok: SMP</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Format Unduhan</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => setDownloadFormat("excel")}
+                    className={`flex items-center justify-center gap-2 py-3 border rounded-xl font-semibold transition-all ${downloadFormat === 'excel' ? 'bg-green-50 border-green-500 text-green-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">table_view</span> Excel
+                  </button>
+                  <button 
+                    onClick={() => setDownloadFormat("pdf")}
+                    className={`flex items-center justify-center gap-2 py-3 border rounded-xl font-semibold transition-all ${downloadFormat === 'pdf' ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span> PDF
+                  </button>
+                </div>
+              </div>
+
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleDownload}
+                disabled={downloading}
+                className="px-6 py-2.5 font-bold bg-primary text-white rounded-xl hover:bg-blue-700 shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {downloading ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                    Memproses...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                    Download
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
