@@ -13,31 +13,37 @@ export async function GET() {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Total Siswa
-    const { count: totalSiswa } = await supabase
-      .from("students")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "aktif");
+    // Optimize by running all queries in parallel
+    const [
+      { count: totalSiswa },
+      { data: payments },
+      { data: unpaidBills },
+      { data: auditLogs }
+    ] = await Promise.all([
+      // Total Siswa
+      supabase
+        .from("students")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "aktif"),
+      // Total Pemasukan
+      supabase
+        .from("payment_transactions")
+        .select("amount"),
+      // Total Tunggakan
+      supabase
+        .from("student_bills")
+        .select("nominal")
+        .eq("status", "Belum Lunas"),
+      // Audit Logs
+      supabase
+        .from("audit_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5)
+    ]);
 
-    // Total Pemasukan
-    const { data: payments } = await supabase
-      .from("payment_transactions")
-      .select("amount");
     const totalPembayaran = (payments || []).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-
-    // Total Tunggakan
-    const { data: unpaidBills } = await supabase
-      .from("student_bills")
-      .select("nominal")
-      .eq("status", "Belum Lunas");
     const totalTunggakan = (unpaidBills || []).reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
-
-    // Audit Logs
-    const { data: auditLogs } = await supabase
-      .from("audit_logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(5);
 
     return NextResponse.json({
       totalSiswa: totalSiswa || 0,
