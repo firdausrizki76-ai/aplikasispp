@@ -21,17 +21,22 @@ export default function LoginPage() {
     // Map username to email as discussed in the plan
     const email = username.includes('@') ? username : `${username}@sekolah.com`;
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (authError) {
-      setError(authError.message === 'Invalid login credentials' ? 'Username atau password salah.' : authError.message);
+      if (authError) {
+        setError(authError.message === 'Invalid login credentials' ? 'Username atau password salah.' : authError.message);
+        setIsLoading(false);
+      } else {
+        router.push('/dashboard');
+        router.refresh();
+      }
+    } catch (err: any) {
+      setError("Koneksi gagal. Pastikan Environment Variables Vercel sudah disetting.");
       setIsLoading(false);
-    } else {
-      router.push('/dashboard');
-      router.refresh();
     }
   };
 
