@@ -54,8 +54,19 @@ export default function DashboardPage() {
     year: "numeric",
   }).format(today);
 
+  if (isSyncing) {
+    return (
+      <div className="view-section h-[80vh] flex flex-col items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-on-surface-variant font-medium tracking-wide">Memeriksa hak akses dan memuat data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="view-section">
+    <div className="view-section animate-page-transition">
       {/* Welcome Header */}
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
