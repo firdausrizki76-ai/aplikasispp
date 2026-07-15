@@ -38,14 +38,20 @@ export default function AuditPage() {
     if (!window.confirm("PERINGATAN: Apakah Anda yakin ingin menghapus SELURUH riwayat log audit ini? Tindakan ini tidak dapat dibatalkan!")) return;
     
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.from("audit_logs").delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    
-    if (error) {
-      alert("Gagal menghapus log audit: " + error.message);
-    } else {
+    try {
+      const response = await fetch('/api/audit/clear', {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Gagal menghapus log audit");
+      }
+
       alert("Log audit berhasil dihapus sepenuhnya.");
       fetchLogs();
+    } catch (err: any) {
+      alert("Gagal menghapus log audit: " + err.message);
     }
     setLoading(false);
   };
