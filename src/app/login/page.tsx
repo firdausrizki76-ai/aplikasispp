@@ -48,7 +48,7 @@ export default function LoginPage() {
         style={{ backgroundImage: "url('https://i.ibb.co.com/HfWcTfx2/Whats-App-Image-2026-07-18-at-09-34-41.jpg')" }}
       >
         {/* Background overlay for fading effect */}
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-0"></div>
+        <div className="absolute inset-0 bg-white/50 z-0"></div>
         
         <div className="relative w-full max-w-2xl mb-10 z-10 pt-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-100/80 backdrop-blur-md text-green-800 font-bold text-sm mb-6 border border-green-200 shadow-sm">
