@@ -44,14 +44,14 @@ export default function LoginPage() {
     <div className="fixed inset-0 z-[100] flex min-h-screen bg-white lg:bg-gray-50/50">
       {/* Left Side (Image Background & Copy) */}
       <div 
-        className="hidden lg:flex flex-col justify-start w-[55%] p-12 relative overflow-hidden border-r border-blue-100/50 bg-blue-50/20 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('https://i.ibb.co.com/93sD9885/Gemini-Generated-Image-jo9iupjo9iupjo9i-jukebox-bg-removed.png')" }}
+        className="hidden lg:flex flex-col justify-start w-[55%] p-12 relative overflow-hidden border-r border-green-100/50 bg-green-50/20 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('https://i.ibb.co.com/HfWcTfx2/Whats-App-Image-2026-07-18-at-09-34-41.jpg')" }}
       >
         {/* Optional overlay if text is hard to read */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/90 via-white/50 to-transparent -z-10"></div>
         
         <div className="w-full max-w-2xl mb-10 z-10 pt-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100/80 backdrop-blur-md text-blue-800 font-bold text-sm mb-6 border border-blue-200 shadow-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-100/80 backdrop-blur-md text-green-800 font-bold text-sm mb-6 border border-green-200 shadow-sm">
             <span className="material-symbols-outlined text-sm">verified</span>
             Sistem Manajemen Terpadu
           </div>
@@ -60,7 +60,7 @@ export default function LoginPage() {
             <span className="text-primary">Pembayaran SPP</span>
           </h1>
           <p className="text-base text-gray-800 font-medium leading-relaxed w-full drop-shadow-sm bg-white/40 p-4 rounded-xl backdrop-blur-sm border border-white/50">
-            Solusi digital modern untuk mengelola administrasi keuangan sekolah. Pantau tagihan, catat transaksi, dan hasilkan laporan secara instan dan akurat.
+            Motto Sekolah: Disiplin, Berilmu dan Berakhlak Mulia
           </p>
         </div>
       </div>
@@ -69,13 +69,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
         <div className="bg-white p-10 sm:p-12 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/80 w-full max-w-[460px] relative z-10">
           <div className="flex flex-col items-center mb-10">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-primary/20 text-white">
-              <span
-                className="material-symbols-outlined text-3xl"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                school
-              </span>
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-primary/20 p-2">
+              <img src="https://i.ibb.co.com/p6Cwtnhr/Untitled-July-18-2026-at-09-37-16.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
               Bayar SPP Pro

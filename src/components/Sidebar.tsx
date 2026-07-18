@@ -38,10 +38,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         <span className="material-symbols-outlined">close</span>
       </button>
       <div className="px-6 mb-10 flex items-center gap-3">
-        <div className="w-10 h-10 bg-on-primary rounded-xl flex items-center justify-center">
-          <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-            school
-          </span>
+        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 shrink-0">
+          <img src="https://i.ibb.co.com/p6Cwtnhr/Untitled-July-18-2026-at-09-37-16.png" alt="Logo" className="w-full h-full object-contain" />
         </div>
         <div>
           <h1 className="font-headline-md text-headline-md font-bold text-on-primary leading-none">Bayar SPP Pro</h1>
