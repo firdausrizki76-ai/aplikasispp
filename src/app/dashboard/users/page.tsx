@@ -42,32 +42,45 @@ export default function UsersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [editFormData, setEditFormData] = useState({ role: '', status: '' });
+  const [editFormData, setEditFormData] = useState({ full_name: '', email: '', password: '', role: '', status: '' });
   const [addFormData, setAddFormData] = useState({ full_name: '', email: '', password: '', role: 'admin' });
   const [submitting, setSubmitting] = useState(false);
   const [addError, setAddError] = useState("");
 
   const openEditModal = (user: any) => {
     setEditingUser(user);
-    setEditFormData({ role: user.role || 'admin', status: user.status || 'aktif' });
+    setEditFormData({ 
+      full_name: user.full_name || '',
+      email: user.email || '',
+      password: '',
+      role: user.role || 'admin', 
+      status: user.status || 'aktif' 
+    });
     setIsEditModalOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const supabase = createClient();
-    const { error } = await supabase.from('profiles').update({
-      role: editFormData.role,
-      status: editFormData.status
-    }).eq('id', editingUser.id);
     
-    setSubmitting(false);
-    if (!error) {
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingUser.id,
+          ...editFormData
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal memperbarui pengguna");
+      
       setIsEditModalOpen(false);
-      setUsers(users.map(u => u.id === editingUser.id ? { ...u, role: editFormData.role, status: editFormData.status } : u));
-    } else {
-      alert("Gagal memperbarui pengguna: " + error.message);
+      setUsers(users.map(u => u.id === editingUser.id ? { ...u, full_name: editFormData.full_name, email: editFormData.email, role: editFormData.role, status: editFormData.status } : u));
+    } catch (err: any) {
+      alert("Gagal memperbarui pengguna: " + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -269,12 +282,33 @@ export default function UsersPage() {
                     <div>
                         <label className="block font-label-md text-on-surface-variant mb-1">Nama Lengkap</label>
                         <input 
-                          className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface-variant cursor-not-allowed" 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white focus:border-primary outline-none" 
                           type="text" 
-                          value={editingUser?.full_name || 'Admin Tanpa Nama'}
-                          disabled
+                          value={editFormData.full_name}
+                          onChange={(e) => setEditFormData({...editFormData, full_name: e.target.value})}
+                          required
                         />
-                        <p className="text-xs text-on-surface-variant mt-1">Nama diatur oleh masing-masing pengguna saat login.</p>
+                    </div>
+                    <div>
+                        <label className="block font-label-md text-on-surface-variant mb-1">Email</label>
+                        <input 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white focus:border-primary outline-none" 
+                          type="email" 
+                          value={editFormData.email}
+                          onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                          required
+                        />
+                    </div>
+                    <div>
+                        <label className="block font-label-md text-on-surface-variant mb-1">Password Baru (Opsional)</label>
+                        <input 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white focus:border-primary outline-none" 
+                          type="password" 
+                          placeholder="Kosongkan jika tidak ingin diubah"
+                          minLength={6}
+                          value={editFormData.password}
+                          onChange={(e) => setEditFormData({...editFormData, password: e.target.value})}
+                        />
                     </div>
                     <div>
                         <label className="block font-label-md text-on-surface-variant mb-1">Peran Akses</label>
