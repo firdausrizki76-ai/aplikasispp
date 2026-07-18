@@ -74,7 +74,7 @@ export default function PembayaranPage() {
 
   // Search logic
   useEffect(() => {
-    if (searchQuery.trim().length > 1) {
+    if (searchQuery.trim().length > 0) {
       const supabase = createClient();
       supabase.from("students")
         .select("*, classes(class_name)")

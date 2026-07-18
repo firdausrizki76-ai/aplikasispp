@@ -41,18 +41,22 @@ export default function HarianPage() {
 
   const handleDeleteTransaction = async (trx: any) => {
     if (confirm(`Apakah Anda yakin ingin menghapus transaksi ${trx.receipt_id} sebesar Rp ${trx.amount.toLocaleString('id-ID')}? \n\nPERHATIAN: Tagihan untuk transaksi ini akan dikembalikan menjadi 'Belum Lunas'.`)) {
-      const supabase = createClient();
-      
-      if (trx.bill_id) {
-        await supabase.from('student_bills').update({ status: 'Belum Lunas' }).eq('id', trx.bill_id);
-      }
-
-      const { error } = await supabase.from('payment_transactions').delete().eq('id', trx.id);
-      if (!error) {
-        setTransactions(transactions.filter(t => t.id !== trx.id));
-        alert("Transaksi berhasil dihapus dan status tagihan dikembalikan menjadi Belum Lunas.");
-      } else {
-        alert("Gagal menghapus transaksi: " + error.message);
+      try {
+        const res = await fetch('/api/harian/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trx_id: trx.id, bill_id: trx.bill_id })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+          setTransactions(transactions.filter(t => t.id !== trx.id));
+          alert("Transaksi berhasil dihapus dan status tagihan dikembalikan menjadi Belum Lunas.");
+        } else {
+          alert("Gagal menghapus transaksi: " + data.error);
+        }
+      } catch (err: any) {
+        alert("Terjadi kesalahan: " + err.message);
       }
     }
   };
@@ -117,7 +121,7 @@ export default function HarianPage() {
                     <tr key={trx.id} className="hover:bg-surface-container-low/30">
                       <td className="px-6 py-4" suppressHydrationWarning>
                         <span className="text-sm">
-                          {new Date(trx.payment_date).toLocaleDateString('en-GB', {timeZone: 'Asia/Makassar', day: '2-digit', month: '2-digit', year: 'numeric'})} {new Date(trx.payment_date).toLocaleTimeString('id-ID', {timeZone: 'Asia/Makassar', hour: '2-digit', minute: '2-digit'})}
+                          {new Date(trx.payment_date).toLocaleDateString('en-GB', {timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric'})} {new Date(trx.payment_date).toLocaleTimeString('id-ID', {timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit'})}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm">

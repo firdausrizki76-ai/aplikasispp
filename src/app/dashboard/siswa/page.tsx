@@ -13,6 +13,8 @@ export default function SiswaPage() {
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<{
@@ -20,12 +22,14 @@ export default function SiswaPage() {
     nama: string;
     jenjang: string;
     kelas_id: string;
+    parent_phone: string;
     diskonRows: { id: number; jenis: string; persen: string }[];
   }>({
     nis: '',
     nama: '',
     jenjang: 'SD',
     kelas_id: '',
+    parent_phone: '',
     diskonRows: [],
   });
 
@@ -99,6 +103,62 @@ export default function SiswaPage() {
     }
   };
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const XLSX = await import('xlsx');
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        const supabase = createClient();
+        const { data: classList } = await supabase.from('classes').select('*');
+        const classMap = new Map();
+        classList?.forEach(c => {
+          classMap.set(`${c.class_name}_${c.grade_level}`.toLowerCase(), c.id);
+        });
+
+        const studentsToInsert = data.map((row: any) => {
+          const jenjang = row['Jenjang'] || 'SD';
+          const className = row['Kelas'] || '';
+          const classKey = `${className}_${jenjang}`.toLowerCase();
+          const classId = classMap.get(classKey);
+
+          return {
+            nis: row['NIS']?.toString() || null,
+            name: row['Nama'],
+            grade_level: jenjang,
+            class_id: classId || null,
+            parent_phone: row['No WA Orang Tua']?.toString() || row['No WA']?.toString() || null,
+            status: 'aktif'
+          };
+        }).filter(s => s.name);
+
+        if (studentsToInsert.length > 0) {
+          const { error } = await supabase.from('students').insert(studentsToInsert);
+          if (error) throw error;
+          alert(`Berhasil mengimpor ${studentsToInsert.length} siswa!`);
+          fetchStudents();
+        } else {
+          alert("Tidak ada data valid yang ditemukan.");
+          setLoading(false);
+        }
+      } catch (err: any) {
+        alert("Gagal mengimpor file: " + err.message);
+        setLoading(false);
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -125,6 +185,7 @@ export default function SiswaPage() {
         name: formData.nama, 
         grade_level: formData.jenjang,
         class_id: formData.kelas_id,
+        parent_phone: formData.parent_phone,
         status: 'aktif',
         diskon: diskonObj
       }
@@ -133,7 +194,7 @@ export default function SiswaPage() {
     setSubmitting(false);
     if (!error) {
       setIsAddModalOpen(false);
-      setFormData({ nis: '', nama: '', jenjang: 'SD', kelas_id: '', diskonRows: [] });
+      setFormData({ nis: '', nama: '', jenjang: 'SD', kelas_id: '', parent_phone: '', diskonRows: [] });
       fetchStudents();
     } else {
       alert("Gagal menambahkan siswa: " + error.message);
@@ -159,6 +220,8 @@ export default function SiswaPage() {
       nama: student.name,
       jenjang: student.grade_level,
       kelas_id: student.class_id,
+      parent_phone: student.parent_phone || '',
+      status: student.status || 'aktif',
       diskonRows: initialDiskonRows
     });
     setIsEditModalOpen(true);
@@ -181,6 +244,8 @@ export default function SiswaPage() {
       name: editData.nama,
       grade_level: editData.jenjang,
       class_id: editData.kelas_id,
+      parent_phone: editData.parent_phone,
+      status: editData.status,
       diskon: diskonObj
     }).eq('id', editData.id);
     
@@ -193,17 +258,33 @@ export default function SiswaPage() {
     }
   };
 
-  const handleDeleteSiswa = async (siswa: any) => {
-    if (confirm(`Apakah Anda yakin ingin menonaktifkan siswa ${siswa.name}? Statusnya akan menjadi 'tidak aktif'.`)) {
-      const supabase = createClient();
-      const { error } = await supabase.from('students').update({ status: 'tidak aktif' }).eq('id', siswa.id);
-      
+  const handleActionDelete = async (type: 'nonaktif' | 'permanen') => {
+    if (!studentToDelete) return;
+    setSubmitting(true);
+    const supabase = createClient();
+
+    if (type === 'nonaktif') {
+      const { error } = await supabase.from('students').update({ status: 'tidak aktif' }).eq('id', studentToDelete.id);
       if (!error) {
-        setStudents(students.map(s => s.id === siswa.id ? { ...s, status: 'tidak aktif' } : s));
+        alert("Siswa berhasil dinonaktifkan.");
+        fetchStudents();
+        setIsDeleteModalOpen(false);
       } else {
-        alert("Gagal menonaktifkan siswa: " + error.message);
+        alert("Gagal menonaktifkan: " + error.message);
+      }
+    } else {
+      if (confirm(`Peringatan: Menghapus permanen akan gagal jika siswa memiliki riwayat tagihan atau transaksi. Lanjutkan?`)) {
+        const { error } = await supabase.from('students').delete().eq('id', studentToDelete.id);
+        if (!error) {
+          alert("Siswa berhasil dihapus permanen.");
+          fetchStudents();
+          setIsDeleteModalOpen(false);
+        } else {
+          alert("Gagal menghapus permanen (mungkin karena data terikat dengan transaksi): " + error.message);
+        }
       }
     }
+    setSubmitting(false);
   };
 
   return (
@@ -218,15 +299,22 @@ export default function SiswaPage() {
               Kelola data induk siswa dan atur diskon khusus (berdasarkan Master Tagihan).
             </p>
           </div>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-primary hover:bg-primary-container text-on-primary px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow"
-          >
-            <span className="material-symbols-outlined text-sm">
-              person_add
-            </span>
-            Tambah Siswa
-          </button>
+          <div className="flex gap-2">
+            <label className="bg-secondary hover:bg-secondary-container text-on-secondary hover:text-on-secondary-container px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow cursor-pointer text-sm">
+              <span className="material-symbols-outlined text-[18px]">upload_file</span>
+              Import Excel
+              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+            </label>
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-primary hover:bg-primary-container text-on-primary px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow text-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                person_add
+              </span>
+              Tambah Siswa
+            </button>
+          </div>
         </div>
         
         <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden flex-1">
@@ -236,9 +324,10 @@ export default function SiswaPage() {
                 <tr>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">NIS</th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Nama Lengkap</th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">No. WA Ortu</th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Jenjang</th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Kelas</th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Diskon (%)</th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Diskon (Rp)</th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Status</th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 text-right">Aksi</th>
                 </tr>
@@ -255,13 +344,14 @@ export default function SiswaPage() {
                       <tr key={siswa.id} className="hover:bg-surface-container-low/30">
                         <td className="px-6 py-4 text-on-surface-variant font-data-mono">{siswa.nis || "-"}</td>
                         <td className="px-6 py-4 font-medium text-primary">{siswa.name}</td>
+                        <td className="px-6 py-4 font-data-mono">{siswa.parent_phone || '-'}</td>
                         <td className="px-6 py-4 font-medium">{siswa.grade_level}</td>
                         <td className="px-6 py-4 font-medium">{siswa.classes?.class_name || '-'}</td>
                         <td className="px-6 py-4 text-sm font-medium">
                           {hasDiskon ? (
                             <ul className="list-none m-0 p-0">
                               {Object.entries(siswa.diskon).map(([jenis, persen]) => (
-                                <li key={jenis} className="text-secondary">{jenis}: <span className="font-bold">{String(persen)}%</span></li>
+                                <li key={jenis} className="text-secondary">{jenis}: <span className="font-bold">Rp {parseInt(persen as string).toLocaleString('id-ID')}</span></li>
                               ))}
                             </ul>
                           ) : (
@@ -282,9 +372,12 @@ export default function SiswaPage() {
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
                           <button 
-                            onClick={() => handleDeleteSiswa(siswa)}
+                            onClick={() => {
+                              setStudentToDelete(siswa);
+                              setIsDeleteModalOpen(true);
+                            }}
                             className="text-error hover:text-red-800 p-2 rounded-lg hover:bg-error-container transition-colors" 
-                            title="Nonaktifkan Siswa"
+                            title="Hapus / Nonaktifkan Siswa"
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>
@@ -327,6 +420,16 @@ export default function SiswaPage() {
                           required 
                           value={formData.nama}
                           onChange={(e) => setFormData({...formData, nama: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block font-label-md text-on-surface-variant mb-1">No. WA Orang Tua (Opsional)</label>
+                        <input 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg" 
+                          type="text"
+                          placeholder="Misal: 08123456789"
+                          value={formData.parent_phone}
+                          onChange={(e) => setFormData({...formData, parent_phone: e.target.value})}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -453,6 +556,16 @@ export default function SiswaPage() {
                           onChange={(e) => setEditData({...editData, nama: e.target.value})}
                         />
                     </div>
+                    <div>
+                        <label className="block font-label-md text-on-surface-variant mb-1">No. WA Orang Tua (Opsional)</label>
+                        <input 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg" 
+                          type="text"
+                          placeholder="Misal: 08123456789"
+                          value={editData.parent_phone}
+                          onChange={(e) => setEditData({...editData, parent_phone: e.target.value})}
+                        />
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block font-label-md text-on-surface-variant mb-1">Jenjang</label>
@@ -479,6 +592,19 @@ export default function SiswaPage() {
                                 ))}
                             </select>
                         </div>
+                    </div>
+                    
+                    <div>
+                        <label className="block font-label-md text-on-surface-variant mb-1">Status Siswa</label>
+                        <select 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white"
+                          value={editData.status}
+                          onChange={(e) => setEditData({...editData, status: e.target.value})}
+                        >
+                            <option value="aktif">Aktif</option>
+                            <option value="tidak aktif">Tidak Aktif</option>
+                            <option value="lulus">Lulus</option>
+                        </select>
                     </div>
 
                     {/* Diskon Section Edit */}
@@ -547,6 +673,42 @@ export default function SiswaPage() {
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Hapus Siswa */}
+      {isDeleteModalOpen && studentToDelete && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-xl w-full max-w-md p-8 shadow-lg relative animate-in fade-in zoom-in duration-200">
+                <h3 className="font-headline-md text-error mb-4 text-center tracking-tight">Hapus Siswa</h3>
+                <p className="text-center text-on-surface-variant mb-6">
+                  Pilih tindakan untuk siswa <strong>{studentToDelete.name}</strong>.
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button 
+                    disabled={submitting}
+                    onClick={() => handleActionDelete('nonaktif')}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg font-bold transition-colors disabled:opacity-50"
+                  >
+                    Nonaktifkan Siswa
+                  </button>
+                  <button 
+                    disabled={submitting}
+                    onClick={() => handleActionDelete('permanen')}
+                    className="w-full bg-error hover:bg-red-700 text-white py-3 rounded-lg font-bold transition-colors disabled:opacity-50"
+                  >
+                    Hapus Permanen
+                  </button>
+                  <button 
+                    disabled={submitting}
+                    onClick={() => setIsDeleteModalOpen(false)}
+                    className="w-full mt-2 py-3 text-on-surface-variant font-bold hover:bg-surface-container rounded-lg transition-colors"
+                  >
+                    Batal
+                  </button>
+                </div>
             </div>
         </div>,
         document.body

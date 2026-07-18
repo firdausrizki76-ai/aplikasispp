@@ -57,6 +57,7 @@ export default function TunggakanPage() {
           name,
           grade_level,
           class_id,
+          parent_phone,
           classes (
             class_name
           )
@@ -112,8 +113,14 @@ export default function TunggakanPage() {
   };
 
   const handleSendWA = (summary: ArrearsSummary) => {
+    let phone = summary.student.parent_phone || '';
+    // Format to 62... if starts with 0
+    if (phone.startsWith('0')) {
+      phone = '62' + phone.substring(1);
+    }
+    
     const text = `Halo Bapak/Ibu wali murid dari ${summary.student.name},\nKami dari pihak sekolah menginformasikan bahwa terdapat tunggakan pembayaran sebanyak ${summary.totalUnpaidBills} tagihan dengan total sebesar Rp ${summary.totalArrears.toLocaleString('id-ID')}. Mohon untuk segera diselesaikan. Terima kasih.`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
 

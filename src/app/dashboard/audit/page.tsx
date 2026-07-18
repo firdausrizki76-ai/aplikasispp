@@ -167,8 +167,8 @@ export default function AuditPage() {
                 filteredLogs.map(log => (
                   <tr key={log.id} className="hover:bg-surface-container-low/30">
                     <td className="px-6 py-4 font-medium" suppressHydrationWarning>
-                      <div className="text-on-surface">{new Date(log.created_at).toLocaleDateString('id-ID', {timeZone: 'Asia/Makassar', day: '2-digit', month:'short', year:'numeric'})}</div>
-                      <div className="text-xs text-on-surface-variant">{new Date(log.created_at).toLocaleTimeString('id-ID', {timeZone: 'Asia/Makassar'})}</div>
+                      <div className="text-on-surface">{new Date(log.created_at).toLocaleDateString('id-ID', {timeZone: 'Asia/Jakarta', day: '2-digit', month:'short', year:'numeric'})}</div>
+                      <div className="text-xs text-on-surface-variant">{new Date(log.created_at).toLocaleTimeString('id-ID', {timeZone: 'Asia/Jakarta'})}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

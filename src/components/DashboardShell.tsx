@@ -28,7 +28,7 @@ export default function DashboardShell({
         {/* Running Text */}
         <div className="bg-primary text-white py-1.5 px-4 text-sm font-medium z-10 w-full overflow-hidden flex whitespace-nowrap border-b border-blue-900 shadow-sm">
           <div className="animate-marquee inline-block">
-            ✨ Selamat datang di SD-SMP Taruna Islam Pekanbaru! Motto Sekolah: Disiplin, Berilmu dan Berakhlak Mulia. ✨
+            ✨ Selamat datang di SD-SMP Taruna Islam Pekanbaru! Disiplin, Berilmu dan Berakhlak Mulia. ✨
           </div>
         </div>
 

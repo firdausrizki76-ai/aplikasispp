@@ -121,6 +121,29 @@ export default function SeragamPage() {
     }
   };
 
+  const handleDeleteSale = async (sale: any) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus riwayat penjualan ${sale.item_name} kepada ${sale.students?.name || 'Siswa'}? Stok akan dikembalikan.`)) {
+      try {
+        const res = await fetch('/api/seragam/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sale_id: sale.id, item_name: sale.item_name, quantity: sale.quantity })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+          setSales(sales.filter(s => s.id !== sale.id));
+          fetchInventory(); // Refresh stock
+          alert("Riwayat penjualan berhasil dihapus dan stok dikembalikan.");
+        } else {
+          alert("Gagal menghapus riwayat: " + data.error);
+        }
+      } catch (err: any) {
+        alert("Terjadi kesalahan: " + err.message);
+      }
+    }
+  };
+
   const handleTransactionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!transactionData.student_id || !transactionData.item_id || !transactionData.quantity) {
@@ -311,6 +334,9 @@ export default function SeragamPage() {
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">
                     Total Harga
                   </th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 text-center">
+                    Aksi
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant text-on-surface">
@@ -326,6 +352,19 @@ export default function SeragamPage() {
                       <td className="px-6 py-4">{sale.item_name}</td>
                       <td className="px-6 py-4">{sale.quantity}</td>
                       <td className="px-6 py-4 font-medium text-green-700">{(sale.total_price || 0).toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4 text-center">
+                        {userRole === 'pimpinan' ? (
+                          <button 
+                            onClick={() => handleDeleteSale(sale)}
+                            className="text-error hover:bg-error-container p-1.5 rounded-lg transition-colors" 
+                            title="Hapus Penjualan"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-on-surface-variant italic cursor-help" title="Hubungi pimpinan untuk menghapus">Akses Terbatas</span>
+                        )}
+                      </td>
                     </tr>
                   ))
                 ) : (

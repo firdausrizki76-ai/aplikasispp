@@ -155,9 +155,9 @@ export default function PengaturanPage() {
           let finalNominal = parseFloat(bulkNominal) || 0;
           // Apply discount if exists for this jenis
           if (s.diskon && s.diskon[bulkJenis]) {
-            const diskonPersen = s.diskon[bulkJenis];
-            if (diskonPersen > 0 && diskonPersen <= 100) {
-              finalNominal = finalNominal - (finalNominal * (diskonPersen / 100));
+            const diskonNominal = s.diskon[bulkJenis];
+            if (diskonNominal > 0) {
+              finalNominal = Math.max(0, finalNominal - diskonNominal);
             }
           }
 

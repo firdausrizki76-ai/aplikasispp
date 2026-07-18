@@ -30,21 +30,31 @@ export default function LaporanPage() {
   const [downloadType, setDownloadType] = useState<"SD" | "SMP" | "SERAGAM_SD" | "SERAGAM_SMP">("SD");
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    // Set default to current year
+  const generateTahunAjaranOptions = () => {
     const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1; // 1-12
-    
-    let startY = currentYear;
-    let endY = currentYear + 1;
+    let currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
     if (currentMonth < 7) {
-      startY = currentYear - 1;
-      endY = currentYear;
+      currentYear -= 1;
     }
+    
+    const options = [];
+    // Start from 2023 as base year, up to currentYear + 1
+    for (let i = 2023; i <= currentYear + 1; i++) {
+      options.push({
+        label: `${i}/${i + 1}`,
+        start: `${i}-07-01`,
+        end: `${i + 1}-06-30`
+      });
+    }
+    return options;
+  };
+  
+  const tahunAjaranOptions = generateTahunAjaranOptions();
+  const [selectedTA, setSelectedTA] = useState<string>("");
 
-    setStartDate(`${startY}-07-01`);
-    setEndDate(`${endY}-06-30`);
+  useEffect(() => {
+    setTahunAjaranIni();
   }, []);
 
   const fetchData = async () => {
@@ -107,16 +117,27 @@ export default function LaporanPage() {
 
   const setTahunAjaranIni = () => {
     const today = new Date();
-    const currentYear = today.getFullYear();
+    let currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
-    let startY = currentYear;
-    let endY = currentYear + 1;
     if (currentMonth < 7) {
-      startY = currentYear - 1;
-      endY = currentYear;
+      currentYear -= 1;
     }
-    setStartDate(`${startY}-07-01`);
-    setEndDate(`${endY}-06-30`);
+    const label = `${currentYear}/${currentYear + 1}`;
+    setStartDate(`${currentYear}-07-01`);
+    setEndDate(`${currentYear + 1}-06-30`);
+    setSelectedTA(label);
+  };
+
+  const handleTAChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedTA(val);
+    if (val) {
+      const opt = tahunAjaranOptions.find(o => o.label === val);
+      if (opt) {
+        setStartDate(opt.start);
+        setEndDate(opt.end);
+      }
+    }
   };
 
   const handleDownload = async () => {
@@ -385,11 +406,24 @@ export default function LaporanPage() {
 
       <div className="bg-white p-5 rounded-xl shadow-sm border border-outline-variant mb-6 flex flex-wrap gap-4 items-end">
         <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1">Tahun Ajaran</label>
+          <select 
+            value={selectedTA}
+            onChange={handleTAChange}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-48 text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+          >
+            <option value="">-- Kustom Tanggal --</option>
+            {tahunAjaranOptions.map(opt => (
+              <option key={opt.label} value={opt.label}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal Mulai</label>
           <input 
             type="date" 
             value={startDate} 
-            onChange={e => setStartDate(e.target.value)}
+            onChange={e => { setStartDate(e.target.value); setSelectedTA(""); }}
             className="border border-gray-300 rounded-lg px-3 py-2 w-40 text-sm focus:ring-2 focus:ring-primary outline-none"
           />
         </div>
@@ -398,16 +432,10 @@ export default function LaporanPage() {
           <input 
             type="date" 
             value={endDate} 
-            onChange={e => setEndDate(e.target.value)}
+            onChange={e => { setEndDate(e.target.value); setSelectedTA(""); }}
             className="border border-gray-300 rounded-lg px-3 py-2 w-40 text-sm focus:ring-2 focus:ring-primary outline-none"
           />
         </div>
-        <button 
-          onClick={setTahunAjaranIni}
-          className="px-4 py-2 bg-secondary-container text-on-secondary-container font-semibold rounded-lg hover:bg-secondary-container/80 transition text-sm flex items-center gap-1"
-        >
-          <span className="material-symbols-outlined text-[18px]">calendar_month</span> Tahun Ajaran Ini
-        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">

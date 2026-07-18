@@ -255,7 +255,7 @@ export default function DashboardPage() {
                         className="hover:bg-surface-container-low/50"
                       >
                         <td className="px-6 py-4 text-sm text-on-surface" suppressHydrationWarning>
-                          {new Date(log.created_at).toLocaleString("id-ID", {timeZone: 'Asia/Makassar'})}
+                          {new Date(log.created_at).toLocaleString("id-ID", {timeZone: 'Asia/Jakarta'})}
                         </td>
                         <td className="px-6 py-4">
                           <span
