@@ -40,11 +40,17 @@ export default function HarianPage() {
   }, []);
 
   const handleDeleteTransaction = async (trx: any) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus transaksi ${trx.receipt_id} sebesar Rp ${trx.amount.toLocaleString('id-ID')}?`)) {
+    if (confirm(`Apakah Anda yakin ingin menghapus transaksi ${trx.receipt_id} sebesar Rp ${trx.amount.toLocaleString('id-ID')}? \n\nPERHATIAN: Tagihan untuk transaksi ini akan dikembalikan menjadi 'Belum Lunas'.`)) {
       const supabase = createClient();
+      
+      if (trx.bill_id) {
+        await supabase.from('student_bills').update({ status: 'Belum Lunas' }).eq('id', trx.bill_id);
+      }
+
       const { error } = await supabase.from('payment_transactions').delete().eq('id', trx.id);
       if (!error) {
         setTransactions(transactions.filter(t => t.id !== trx.id));
+        alert("Transaksi berhasil dihapus dan status tagihan dikembalikan menjadi Belum Lunas.");
       } else {
         alert("Gagal menghapus transaksi: " + error.message);
       }
