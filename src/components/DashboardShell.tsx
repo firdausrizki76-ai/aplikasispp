@@ -28,15 +28,17 @@ export default function DashboardShell({
         {/* Running Text */}
         <div className="bg-primary text-white py-1.5 px-4 text-sm font-medium z-10 w-full overflow-hidden flex whitespace-nowrap border-b border-blue-900 shadow-sm">
           <div className="animate-marquee inline-block">
-            ✨ Selamat datang di Aplikasi Bayar SPP Pro! Sistem Manajemen Keuangan Sekolah Modern, Aman, Terintegrasi, dan Real-Time. ✨
+            ✨ Selamat datang di SD-SMP Taruna Islam Pekanbaru! Motto Sekolah: Disiplin, Berilmu dan Berakhlak Mulia. ✨
           </div>
         </div>
 
         {/* Mobile Header */}
         <header className="md:hidden bg-primary text-on-primary h-16 flex items-center justify-between px-4 z-30 sticky top-0 shadow-md">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-on-primary">school</span>
-            <h1 className="font-headline-sm text-headline-sm font-bold">Bayar SPP Pro</h1>
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
+              <img src="https://i.ibb.co.com/p6Cwtnhr/Untitled-July-18-2026-at-09-37-16.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <h1 className="text-sm font-bold truncate">SD-SMP Taruna Islam Pekanbaru</h1>
           </div>
           <button 
             onClick={() => setIsSidebarOpen(true)}
