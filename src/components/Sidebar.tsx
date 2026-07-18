@@ -42,7 +42,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
           <img src="https://i.ibb.co.com/p6Cwtnhr/Untitled-July-18-2026-at-09-37-16.png" alt="Logo" className="w-full h-full object-contain" />
         </div>
         <div>
-          <h1 className="font-headline-md text-headline-md font-bold text-on-primary leading-none">Bayar SPP Pro</h1>
+          <h1 className="text-base font-bold text-on-primary leading-tight">SD-SMP Taruna Islam Pekanbaru</h1>
           <p className="font-label-md text-label-md text-on-primary/60 mt-1">Sistem Keuangan</p>
           <p className="text-[10px] uppercase font-bold text-secondary-container mt-1 bg-black/20 inline-block px-2 py-0.5 rounded">T.A. {
             (() => {
