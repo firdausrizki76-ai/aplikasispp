@@ -27,7 +27,7 @@ export default function TutupBukuPage() {
   };
 
   const handleTutupBuku = async () => {
-    const confirm1 = window.confirm("PERINGATAN KERAS!\n\nTindakan ini akan mengosongkan seluruh riwayat pembayaran, mereset tagihan, dan menaikkan kelas siswa secara otomatis.\n\nApakah Anda YAKIN sudah mengunduh semua arsip Excel?");
+    const confirm1 = window.confirm("PERINGATAN KERAS!\n\nTindakan ini akan mengosongkan seluruh riwayat pembayaran dan menaikkan kelas siswa secara otomatis.\n\nSiswa yang belum lunas tunggakannya akan tetap dinaikan kelas, tapi statusnya menunggak dan tagihannya dari tahun ajaran sebelumnya tidak akan ter-reset/hilang.\n\nApakah Anda YAKIN sudah mengunduh semua arsip Excel?");
     if (!confirm1) return;
 
     const confirm2 = window.confirm("Apakah Anda benar-benar yakin ingin melakukan PROSES TUTUP BUKU sekarang?");
@@ -138,7 +138,7 @@ export default function TutupBukuPage() {
             <div>
               <h3 className="font-bold text-error text-xl mb-2">Reset Tahun Ajaran (Danger Zone)</h3>
               <p className="text-on-surface-variant mb-6 max-w-4xl">
-                Tindakan ini akan mengosongkan seluruh riwayat pembayaran, mereset tagihan ke kondisi awal, dan menaikkan kelas siswa. Pastikan Anda telah <strong>mengunduh semua arsip di atas</strong> sebelum melakukan reset.
+                Tindakan ini akan mengosongkan seluruh riwayat pembayaran dan menaikkan kelas siswa. <strong className="text-error">Siswa yang belum lunas tunggakannya akan tetap dinaikan kelas, tapi tagihannya dari tahun ajaran sebelumnya tidak akan ter-reset/hilang (status menunggak).</strong> Pastikan Anda telah <strong>mengunduh semua arsip di atas</strong> sebelum melakukan proses ini.
               </p>
               <button 
                 onClick={handleTutupBuku}

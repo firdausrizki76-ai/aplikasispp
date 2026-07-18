@@ -144,8 +144,21 @@ export async function POST() {
     const { error: delTransErr } = await supabase.from('payment_transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // delete all
     if (delTransErr) throw new Error('Gagal menghapus transaksi: ' + delTransErr.message);
 
-    const { error: delBillsErr } = await supabase.from('student_bills').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // delete all
-    if (delBillsErr) throw new Error('Gagal menghapus tagihan: ' + delBillsErr.message);
+    // Hanya hapus tagihan yang sudah lunas
+    const { error: delBillsErr } = await supabase.from('student_bills').delete().eq('status', 'Lunas');
+    if (delBillsErr) throw new Error('Gagal menghapus tagihan lunas: ' + delBillsErr.message);
+
+    // Tandai tagihan yang belum lunas sebagai tagihan dari tahun ajaran sebelumnya
+    const { data: unpaidBills } = await supabase.from('student_bills').select('*').eq('status', 'Belum Lunas');
+    if (unpaidBills) {
+      for (const bill of unpaidBills) {
+        if (bill.bulan_tagihan && !bill.bulan_tagihan.includes('T.A. Lalu')) {
+          await supabase.from('student_bills').update({
+            bulan_tagihan: `${bill.bulan_tagihan} (T.A. Lalu)`
+          }).eq('id', bill.id);
+        }
+      }
+    }
 
     // Add Audit Log
     await supabase.from("audit_logs").insert({

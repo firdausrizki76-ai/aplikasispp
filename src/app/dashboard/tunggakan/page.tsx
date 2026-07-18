@@ -168,6 +168,7 @@ export default function TunggakanPage() {
                 <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Kelas</th>
                 <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Lama Menunggak</th>
                 <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Total Tunggakan</th>
+                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Keterangan</th>
                 <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Tindakan</th>
               </tr>
             </thead>
@@ -201,6 +202,15 @@ export default function TunggakanPage() {
                         </span>
                       )}
                       Rp {d.totalArrears.toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-6 py-4">
+                      {d.bills.some((b: any) => b.bulan_tagihan?.includes('T.A. Lalu')) ? (
+                        <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-bold border border-amber-200">
+                          Tunggakan T.A. Lalu
+                        </span>
+                      ) : (
+                        <span className="text-on-surface-variant text-sm">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <button 
