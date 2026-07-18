@@ -9,6 +9,7 @@ export default function SeragamPage() {
   const [sales, setSales] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState('');
 
   const fetchSales = async () => {
     const supabase = createClient();
@@ -28,6 +29,11 @@ export default function SeragamPage() {
 
       const { data: stuData } = await supabase.from("students").select("id, name, grade_level").order("name");
       setStudents(stuData || []);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserRole(user.user_metadata?.role || '');
+      }
       
       setLoading(false);
     };
@@ -244,20 +250,26 @@ export default function SeragamPage() {
                       </td>
                       <td className="px-6 py-4 font-medium text-green-700">{(item.unit_price || 0).toLocaleString('id-ID')}</td>
                       <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => openEditModal(item)}
-                          className="text-secondary hover:text-primary p-2 rounded-lg hover:bg-secondary/10 transition-colors" 
-                          title="Edit Stok"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteItem(item)}
-                          className="text-error hover:text-red-800 p-2 rounded-lg hover:bg-error-container transition-colors" 
-                          title="Hapus Stok"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
+                        {userRole === 'pimpinan' ? (
+                          <>
+                            <button 
+                              onClick={() => openEditModal(item)}
+                              className="text-secondary hover:text-primary p-2 rounded-lg hover:bg-secondary/10 transition-colors" 
+                              title="Edit Stok"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteItem(item)}
+                              className="text-error hover:text-red-800 p-2 rounded-lg hover:bg-error-container transition-colors" 
+                              title="Hapus Stok"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-on-surface-variant italic cursor-help" title="Hubungi pimpinan untuk edit data">Hubungi Pimpinan</span>
+                        )}
                       </td>
                     </tr>
                   ))

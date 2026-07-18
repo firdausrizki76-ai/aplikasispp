@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 export default function HarianPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState('');
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -26,8 +27,29 @@ export default function HarianPage() {
       setIsLoading(false);
     };
 
+    const fetchUserRole = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserRole(user.user_metadata?.role || '');
+      }
+    };
+
     fetchTransactions();
+    fetchUserRole();
   }, []);
+
+  const handleDeleteTransaction = async (trx: any) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus transaksi ${trx.receipt_id} sebesar Rp ${trx.amount.toLocaleString('id-ID')}?`)) {
+      const supabase = createClient();
+      const { error } = await supabase.from('payment_transactions').delete().eq('id', trx.id);
+      if (!error) {
+        setTransactions(transactions.filter(t => t.id !== trx.id));
+      } else {
+        alert("Gagal menghapus transaksi: " + error.message);
+      }
+    }
+  };
 
   return (
     <>
@@ -113,9 +135,17 @@ export default function HarianPage() {
                         {trx.profiles?.full_name || 'Admin'}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button className="text-error hover:bg-error-container p-1.5 rounded-lg transition-colors" title="Hapus transaksi (Admin Only)">
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
+                        {userRole === 'pimpinan' ? (
+                          <button 
+                            onClick={() => handleDeleteTransaction(trx)}
+                            className="text-error hover:bg-error-container p-1.5 rounded-lg transition-colors" 
+                            title="Hapus transaksi"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-on-surface-variant italic cursor-help" title="Hubungi pimpinan untuk menghapus">Akses Terbatas</span>
+                        )}
                       </td>
                     </tr>
                   ))
