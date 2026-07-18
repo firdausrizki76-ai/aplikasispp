@@ -39,8 +39,8 @@ export default function LaporanPage() {
     }
     
     const options = [];
-    // Start from 2023 as base year, up to currentYear + 1
-    for (let i = 2023; i <= currentYear + 1; i++) {
+    // Start from 2023 as base year, up to 2100 as requested by client
+    for (let i = 2023; i <= 2100; i++) {
       options.push({
         label: `${i}/${i + 1}`,
         start: `${i}-07-01`,
