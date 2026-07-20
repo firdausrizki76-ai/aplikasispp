@@ -26,10 +26,14 @@ export async function POST(req: Request) {
       
       const restoredNominal = currentNominal + amountToRestore;
       
-      await supabaseAdmin.from('student_bills').update({ 
+      const { error: updateError } = await supabaseAdmin.from('student_bills').update({ 
         status: 'Belum Lunas',
         nominal: restoredNominal
       }).eq('id', bill_id);
+      
+      if (updateError) {
+        throw new Error("Gagal memulihkan tagihan: " + updateError.message);
+      }
     }
 
     // Delete transaction
