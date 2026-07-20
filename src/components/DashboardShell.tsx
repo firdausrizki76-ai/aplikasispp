@@ -11,7 +11,12 @@ export default function DashboardShell({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden relative">
+    <div 
+      className="flex h-screen overflow-hidden relative bg-cover bg-center bg-no-repeat bg-fixed"
+      style={{ backgroundImage: "url('https://i.ibb.co.com/HfWcTfx2/Whats-App-Image-2026-07-18-at-09-34-41.jpg')" }}
+    >
+      {/* Light Overlay for fading effect */}
+      <div className="absolute inset-0 bg-white/80 md:bg-white/90 z-0 pointer-events-none"></div>
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 

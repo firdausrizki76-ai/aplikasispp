@@ -21,6 +21,29 @@ export default function TunggakanPage() {
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<ArrearsSummary | null>(null);
 
+  // Edit Bill State
+  const [editingBillId, setEditingBillId] = useState<string | null>(null);
+  const [editBillNominal, setEditBillNominal] = useState<number>(0);
+
+  const handleSaveBillEdit = async (billId: string) => {
+    const supabase = createClient();
+    
+    // Jika 0, set status jadi Lunas agar dianggap bebas/diskon 100%
+    const status = editBillNominal <= 0 ? 'Lunas' : 'Belum Lunas';
+    
+    const { error } = await supabase.from('student_bills')
+      .update({ nominal: editBillNominal, status })
+      .eq('id', billId);
+      
+    if (!error) {
+      setEditingBillId(null);
+      setSelectedStudent(null);
+      fetchArrears();
+    } else {
+      alert("Gagal menyimpan perubahan: " + error.message);
+    }
+  };
+
   // Filters
   const [filterJenjang, setFilterJenjang] = useState<string>("");
   const [filterKelas, setFilterKelas] = useState<string>("");
@@ -280,8 +303,43 @@ export default function TunggakanPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-error">Rp {Number(bill.nominal).toLocaleString('id-ID')}</p>
+                    <div className="flex items-center gap-3 text-right">
+                      {editingBillId === bill.id ? (
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            className="w-24 px-2 py-1 border border-outline-variant rounded-md text-sm"
+                            value={editBillNominal}
+                            onChange={(e) => setEditBillNominal(Number(e.target.value))}
+                          />
+                          <button 
+                            onClick={() => handleSaveBillEdit(bill.id)}
+                            className="text-green-600 hover:bg-green-100 p-1 rounded transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">check</span>
+                          </button>
+                          <button 
+                            onClick={() => setEditingBillId(null)}
+                            className="text-error hover:bg-error-container p-1 rounded transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="font-bold text-error">Rp {Number(bill.nominal).toLocaleString('id-ID')}</p>
+                          <button 
+                            onClick={() => {
+                              setEditingBillId(bill.id);
+                              setEditBillNominal(Number(bill.nominal));
+                            }}
+                            className="text-secondary hover:text-primary hover:bg-surface-container p-1.5 rounded-lg transition-colors"
+                            title="Edit/Bebaskan Tagihan"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   </li>
                 ))}

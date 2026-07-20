@@ -24,8 +24,8 @@ export default function PembayaranPage() {
   const [loadingBills, setLoadingBills] = useState(false);
   const [masterBillsMap, setMasterBillsMap] = useState<Record<string, number>>({});
   
-  // Selected bills to pay
-  const [selectedBillsToPay, setSelectedBillsToPay] = useState<Set<string>>(new Set());
+  // Selected bills to pay and their amounts
+  const [selectedBillsToPay, setSelectedBillsToPay] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchStudentsWithPayments = async () => {
@@ -93,7 +93,7 @@ export default function PembayaranPage() {
     setSearchQuery(student.name);
     setSearchResults([]);
     setLoadingBills(true);
-    setSelectedBillsToPay(new Set());
+    setSelectedBillsToPay({});
     
     const supabase = createClient();
     const { data } = await supabase.from("student_bills")
@@ -106,25 +106,29 @@ export default function PembayaranPage() {
     setLoadingBills(false);
   };
 
-  const toggleBillSelection = (billId: string) => {
-    const newSet = new Set(selectedBillsToPay);
-    if (newSet.has(billId)) {
-      newSet.delete(billId);
+  const toggleBillSelection = (billId: string, nominal: number) => {
+    const newRecord = { ...selectedBillsToPay };
+    if (newRecord[billId] !== undefined) {
+      delete newRecord[billId];
     } else {
-      newSet.add(billId);
+      newRecord[billId] = nominal;
     }
-    setSelectedBillsToPay(newSet);
+    setSelectedBillsToPay(newRecord);
+  };
+
+  const handlePartialAmountChange = (billId: string, amount: number) => {
+    if (selectedBillsToPay[billId] !== undefined) {
+      setSelectedBillsToPay(prev => ({ ...prev, [billId]: amount }));
+    }
   };
 
   const calculateTotal = () => {
-    return unpaidBills
-      .filter(b => selectedBillsToPay.has(b.id))
-      .reduce((sum, b) => sum + b.nominal, 0);
+    return Object.values(selectedBillsToPay).reduce((sum, amount) => sum + amount, 0);
   };
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStudent || selectedBillsToPay.size === 0) {
+    if (!selectedStudent || Object.keys(selectedBillsToPay).length === 0) {
       alert("Pilih siswa dan minimal 1 tagihan untuk dibayar.");
       return;
     }
@@ -135,7 +139,7 @@ export default function PembayaranPage() {
     const receiptId = `TRX-${new Date().getTime()}`;
 
     // Get selected bills
-    const billsToPay = unpaidBills.filter(b => selectedBillsToPay.has(b.id));
+    const billsToPay = unpaidBills.filter(b => selectedBillsToPay[b.id] !== undefined);
 
     try {
       // 1. Get current user
@@ -147,16 +151,19 @@ export default function PembayaranPage() {
         student_id: selectedStudent.id,
         bill_id: bill.id,
         jenis_tagihan: `${bill.jenis_tagihan} ${bill.bulan_tagihan}`,
-        amount: bill.nominal,
+        amount: selectedBillsToPay[bill.id],
         admin_id: user?.id || null
       }));
 
       const { error: txError } = await supabase.from("payment_transactions").insert(transactionsToInsert);
       if (txError) throw txError;
 
-      // 3. Update student_bills status to Lunas
+      // 3. Update student_bills status to Lunas if fully paid, otherwise reduce nominal
       for (const bill of billsToPay) {
-        await supabase.from("student_bills").update({ status: "Lunas" }).eq("id", bill.id);
+        const payAmount = selectedBillsToPay[bill.id];
+        const newNominal = bill.nominal - payAmount;
+        const status = newNominal <= 0 ? "Lunas" : "Belum Lunas";
+        await supabase.from("student_bills").update({ status, nominal: newNominal }).eq("id", bill.id);
       }
 
       alert("Pembayaran berhasil dicatat!");
@@ -164,7 +171,7 @@ export default function PembayaranPage() {
       setSelectedStudent(null);
       setSearchQuery("");
       setUnpaidBills([]);
-      setSelectedBillsToPay(new Set());
+      setSelectedBillsToPay({});
       
       // Refresh Data
       fetchStudentsWithPayments();
@@ -330,21 +337,36 @@ export default function PembayaranPage() {
                       <label key={bill.id} className="flex items-center gap-4 p-3 border border-outline-variant rounded-lg bg-white cursor-pointer hover:border-primary transition-colors">
                         <input 
                           type="checkbox" 
-                          className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                          checked={selectedBillsToPay.has(bill.id)}
-                          onChange={() => toggleBillSelection(bill.id)}
+                          className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary mt-1 shrink-0"
+                          checked={selectedBillsToPay[bill.id] !== undefined}
+                          onChange={() => toggleBillSelection(bill.id, Number(bill.nominal))}
                         />
-                        <div className="flex-1">
-                          <div className="font-bold text-on-surface">{bill.jenis_tagihan} {bill.bulan_tagihan}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-on-surface truncate">{bill.jenis_tagihan} {bill.bulan_tagihan}</div>
                           <div className="text-xs text-error">Jatuh Tempo: {new Date(bill.tanggal_jatuh_tempo).toLocaleDateString('id-ID')}</div>
-                        </div>
-                        <div className="font-bold text-primary flex items-center justify-end min-w-[120px]">
                           {masterBillsMap[bill.jenis_tagihan] && masterBillsMap[bill.jenis_tagihan] > Number(bill.nominal) && (
-                            <span className="line-through text-on-surface-variant text-xs mr-2 opacity-70">
-                              Rp {masterBillsMap[bill.jenis_tagihan].toLocaleString('id-ID')}
-                            </span>
+                            <div className="line-through text-on-surface-variant text-xs opacity-70 mt-0.5">
+                              Normal: Rp {masterBillsMap[bill.jenis_tagihan].toLocaleString('id-ID')}
+                            </div>
                           )}
-                          Rp {Number(bill.nominal).toLocaleString('id-ID')}
+                        </div>
+                        <div className="font-bold text-primary flex items-center justify-end shrink-0">
+                          {selectedBillsToPay[bill.id] !== undefined ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-on-surface-variant font-normal">Bayar:</span>
+                              <input 
+                                type="number" 
+                                className="w-28 sm:w-32 px-2 py-1.5 border border-primary rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                value={selectedBillsToPay[bill.id]}
+                                onChange={(e) => handlePartialAmountChange(bill.id, Number(e.target.value))}
+                                max={Number(bill.nominal)}
+                                min={0}
+                                onClick={(e) => e.stopPropagation()} // Prevent toggling checkbox when clicking input
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-sm">Rp {Number(bill.nominal).toLocaleString('id-ID')}</span>
+                          )}
                         </div>
                       </label>
                     ))
@@ -362,7 +384,7 @@ export default function PembayaranPage() {
                 <button 
                   className="flex-[2] bg-primary text-on-primary font-bold py-3 rounded-xl shadow hover:bg-primary-container transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50" 
                   type="submit"
-                  disabled={isSubmitting || selectedBillsToPay.size === 0}
+                  disabled={isSubmitting || Object.keys(selectedBillsToPay).length === 0}
                 >
                   <span className={`material-symbols-outlined ${isSubmitting ? 'animate-spin' : ''}`}>
                     {isSubmitting ? 'sync' : 'send'}
