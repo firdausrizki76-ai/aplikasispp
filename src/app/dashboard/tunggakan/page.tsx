@@ -20,7 +20,9 @@ interface ArrearsSummary {
 export default function TunggakanPage() {
   const [arrearsData, setArrearsData] = useState<ArrearsSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<ArrearsSummary | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -121,6 +123,7 @@ export default function TunggakanPage() {
       }
       if (data) {
         allBills = [...allBills, ...data];
+        setLoadingProgress(allBills.length);
         if (data.length < step) break;
       } else {
         break;
@@ -195,6 +198,7 @@ export default function TunggakanPage() {
     // Assuming we map class filter to class_name string matching for simplicity since class_id could be missing
     const className = d.student.classes?.class_name || d.student.class_name || "";
     if (filterKelas && className !== filterKelas) return false;
+    if (searchQuery && !d.student.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -250,7 +254,17 @@ export default function TunggakanPage() {
             Daftar siswa yang belum melunasi kewajiban pembayaran SPP sesuai bulan berjalan.
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
+          <div className="relative flex items-center">
+            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
+            <input 
+              type="text"
+              placeholder="Cari nama siswa..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-outline-variant rounded-lg bg-surface focus:ring-primary focus:border-primary outline-none min-w-[200px]"
+            />
+          </div>
           <select 
             value={filterJenjang}
             onChange={(e) => setFilterJenjang(e.target.value)}
@@ -300,7 +314,7 @@ export default function TunggakanPage() {
             <tbody className="divide-y divide-outline-variant text-on-surface">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat data dari database...</td>
+                  <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat data dari database... {loadingProgress > 0 && `(${loadingProgress.toLocaleString('id-ID')} tagihan)`}</td>
                 </tr>
               ) : sortedData.length > 0 ? (
                 sortedData.map(d => (
