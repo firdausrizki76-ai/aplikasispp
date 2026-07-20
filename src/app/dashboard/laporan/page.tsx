@@ -64,10 +64,27 @@ export default function LaporanPage() {
     const supabase = createClient();
     
     // Just fetch some basic stats to show on the dashboard UI based on dates
-    const { data: bills } = await supabase.from('student_bills')
-      .select('*, students!inner(grade_level)')
-      .gte('created_at', `${startDate}T00:00:00Z`)
-      .lte('created_at', `${endDate}T23:59:59Z`);
+    let allBills: any[] = [];
+    let from = 0;
+    const step = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase.from('student_bills')
+        .select('*, students!inner(grade_level)')
+        .gte('created_at', `${startDate}T00:00:00Z`)
+        .lte('created_at', `${endDate}T23:59:59Z`)
+        .range(from, from + step - 1);
+        
+      if (error) break;
+      if (data) {
+        allBills = [...allBills, ...data];
+        if (data.length < step) break;
+      } else {
+        break;
+      }
+      from += step;
+    }
+    const bills = allBills;
       
     const { data: sales } = await supabase.from('sales')
       .select('*')
@@ -166,10 +183,27 @@ export default function LaporanPage() {
       .eq('classes.grade_level', jenjang)
       .order('name');
       
-    const { data: bills } = await supabase.from('student_bills')
-      .select('*, payment_transactions(payment_date)')
-      .gte('created_at', `${startDate}T00:00:00Z`)
-      .lte('created_at', `${endDate}T23:59:59Z`);
+    let allBillsReport: any[] = [];
+    let from = 0;
+    const step = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase.from('student_bills')
+        .select('*, payment_transactions(payment_date)')
+        .gte('created_at', `${startDate}T00:00:00Z`)
+        .lte('created_at', `${endDate}T23:59:59Z`)
+        .range(from, from + step - 1);
+        
+      if (error) break;
+      if (data) {
+        allBillsReport = [...allBillsReport, ...data];
+        if (data.length < step) break;
+      } else {
+        break;
+      }
+      from += step;
+    }
+    const bills = allBillsReport;
 
     const { data: master } = await supabase.from('master_tagihan').select('nama_tagihan');
     

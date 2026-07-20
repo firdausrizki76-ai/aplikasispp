@@ -86,27 +86,49 @@ export default function TunggakanPage() {
     setLoading(true);
     const supabase = createClient();
     
-    // Fetch all unpaid bills and join with student and class info
-    const { data: bills, error } = await supabase
-      .from("student_bills")
-      .select(`
-        id, 
-        nominal,
-        jenis_tagihan,
-        bulan_tagihan,
-        student_id,
-        students (
-          id,
-          name,
-          grade_level,
-          class_id,
-          parent_phone,
-          classes (
-            class_name
+    // Fetch all unpaid bills using pagination (to bypass 1000 rows limit)
+    let allBills: any[] = [];
+    let from = 0;
+    const step = 1000;
+    let fetchError = null;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("student_bills")
+        .select(`
+          id, 
+          nominal,
+          jenis_tagihan,
+          bulan_tagihan,
+          student_id,
+          students (
+            id,
+            name,
+            grade_level,
+            class_id,
+            parent_phone,
+            classes (
+              class_name
+            )
           )
-        )
-      `)
-      .eq("status", "Belum Lunas");
+        `)
+        .eq("status", "Belum Lunas")
+        .range(from, from + step - 1);
+
+      if (error) {
+        fetchError = error;
+        break;
+      }
+      if (data) {
+        allBills = [...allBills, ...data];
+        if (data.length < step) break;
+      } else {
+        break;
+      }
+      from += step;
+    }
+    const bills = allBills;
+    const error = fetchError;
 
     const { data: masterBills } = await supabase.from("master_tagihan").select("*");
     const masterBillsMap: Record<string, number> = {};

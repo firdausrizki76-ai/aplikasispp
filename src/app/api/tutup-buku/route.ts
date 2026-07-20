@@ -149,9 +149,28 @@ export async function POST() {
     if (delBillsErr) throw new Error('Gagal menghapus tagihan lunas: ' + delBillsErr.message);
 
     // Tandai tagihan yang belum lunas sebagai tagihan dari tahun ajaran sebelumnya
-    const { data: unpaidBills } = await supabase.from('student_bills').select('*').eq('status', 'Belum Lunas');
-    if (unpaidBills) {
-      for (const bill of unpaidBills) {
+    let allUnpaidBills: any[] = [];
+    let from = 0;
+    const step = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase.from('student_bills')
+        .select('*')
+        .eq('status', 'Belum Lunas')
+        .range(from, from + step - 1);
+        
+      if (error) break;
+      if (data) {
+        allUnpaidBills = [...allUnpaidBills, ...data];
+        if (data.length < step) break;
+      } else {
+        break;
+      }
+      from += step;
+    }
+
+    if (allUnpaidBills.length > 0) {
+      for (const bill of allUnpaidBills) {
         if (bill.bulan_tagihan && !bill.bulan_tagihan.includes('T.A. Lalu')) {
           await supabase.from('student_bills').update({
             bulan_tagihan: `${bill.bulan_tagihan} (T.A. Lalu)`
