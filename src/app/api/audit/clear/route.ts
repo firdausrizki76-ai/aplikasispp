@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/utils/supabase/server";
 
 export async function DELETE() {
   try {
+    const supabaseAuth = await createClient();
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: profile } = await supabaseAuth.from("profiles").select("role").eq("id", user.id).single();
+    
+    if (!profile || profile.role !== 'pimpinan') {
+      return NextResponse.json({ success: false, error: "Forbidden: Only pimpinan can clear logs" }, { status: 403 });
+    }
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     
@@ -10,7 +23,7 @@ export async function DELETE() {
       throw new Error("Missing Supabase credentials in server");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createSupabaseClient(supabaseUrl, supabaseServiceKey);
 
     // Hapus semua log
     const { error } = await supabase

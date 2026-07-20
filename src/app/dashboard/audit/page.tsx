@@ -15,6 +15,18 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+
+  const checkRole = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (profile) {
+        setCurrentUserRole(profile.role);
+      }
+    }
+  };
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -32,6 +44,7 @@ export default function AuditPage() {
 
   useEffect(() => {
     fetchLogs();
+    checkRole();
   }, []);
 
   const handleClearLog = async () => {
@@ -139,10 +152,12 @@ export default function AuditPage() {
             <span className="material-symbols-outlined text-sm">refresh</span>
             Refresh
           </button>
-          <button onClick={handleClearLog} className="bg-error hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold transition-all shadow-sm">
-            <span className="material-symbols-outlined text-sm">delete_sweep</span>
-            Hapus Record
-          </button>
+          {currentUserRole === 'pimpinan' && (
+            <button onClick={handleClearLog} className="bg-error hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold transition-all shadow-sm">
+              <span className="material-symbols-outlined text-sm">delete_sweep</span>
+              Hapus Record
+            </button>
+          )}
         </div>
       </div>
       
