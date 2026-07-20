@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
+import BackgroundSlideshow from '@/components/BackgroundSlideshow';
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
@@ -44,9 +46,9 @@ export default function LoginPage() {
     <div className="fixed inset-0 z-[100] flex min-h-screen bg-white lg:bg-gray-50/50">
       {/* Left Side (Image Background & Copy) */}
       <div 
-        className="hidden lg:flex flex-col justify-start w-[55%] p-12 relative overflow-hidden border-r border-green-100/50 bg-green-50/20 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('https://i.ibb.co.com/HfWcTfx2/Whats-App-Image-2026-07-18-at-09-34-41.jpg')" }}
+        className="hidden lg:flex flex-col justify-start w-[55%] p-12 relative overflow-hidden border-r border-green-100/50 bg-green-50/20"
       >
+        <BackgroundSlideshow />
         {/* Background overlay for fading effect */}
         <div className="absolute inset-0 bg-white/50 z-0"></div>
         

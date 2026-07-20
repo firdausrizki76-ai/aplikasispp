@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 
+import BackgroundSlideshow from '@/components/BackgroundSlideshow';
+
 export default function DashboardShell({
   children,
 }: {
@@ -12,9 +14,9 @@ export default function DashboardShell({
 
   return (
     <div 
-      className="flex h-screen overflow-hidden relative bg-cover bg-center bg-no-repeat bg-fixed"
-      style={{ backgroundImage: "url('https://i.ibb.co.com/HfWcTfx2/Whats-App-Image-2026-07-18-at-09-34-41.jpg')" }}
+      className="flex h-screen overflow-hidden relative"
     >
+      <BackgroundSlideshow />
       {/* Light Overlay for fading effect - Opacity reduced to make background more visible */}
       <div className="absolute inset-0 bg-white/60 md:bg-white/70 z-0 pointer-events-none"></div>
       {/* Mobile Overlay */}
