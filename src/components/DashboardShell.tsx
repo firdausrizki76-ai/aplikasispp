@@ -15,8 +15,8 @@ export default function DashboardShell({
       className="flex h-screen overflow-hidden relative bg-cover bg-center bg-no-repeat bg-fixed"
       style={{ backgroundImage: "url('https://i.ibb.co.com/HfWcTfx2/Whats-App-Image-2026-07-18-at-09-34-41.jpg')" }}
     >
-      {/* Light Overlay for fading effect */}
-      <div className="absolute inset-0 bg-white/80 md:bg-white/90 z-0 pointer-events-none"></div>
+      {/* Light Overlay for fading effect - Opacity reduced to make background more visible */}
+      <div className="absolute inset-0 bg-white/60 md:bg-white/70 z-0 pointer-events-none"></div>
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
