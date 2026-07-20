@@ -22,6 +22,33 @@ export default function KelasPage() {
   const [isArrearsModalOpen, setIsArrearsModalOpen] = useState(false);
   const [loadingArrears, setLoadingArrears] = useState(false);
 
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const sortedClasses = [...classes].sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    const aValue = a[sortConfig.key] || '';
+    const bValue = b[sortConfig.key] || '';
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return <span className="material-symbols-outlined text-[14px] ml-1 opacity-20">sort</span>;
+    return <span className="material-symbols-outlined text-[14px] ml-1 text-primary">{sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>;
+  };
+
   const fetchClasses = async () => {
     setLoading(true);
     const supabase = createClient();
@@ -221,14 +248,14 @@ export default function KelasPage() {
             <table className="w-full text-left border-collapse text-sm">
               <thead className="bg-surface-container-low border-b border-outline-variant">
                 <tr>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">
-                    Jenjang
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('grade_level')}>
+                    <div className="flex items-center">Jenjang {getSortIcon('grade_level')}</div>
                   </th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">
-                    Nama Kelas
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('class_name')}>
+                    <div className="flex items-center">Nama Kelas {getSortIcon('class_name')}</div>
                   </th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">
-                    Wali Kelas
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('homeroom_teacher')}>
+                    <div className="flex items-center">Wali Kelas {getSortIcon('homeroom_teacher')}</div>
                   </th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 text-right">
                     Aksi
@@ -240,8 +267,8 @@ export default function KelasPage() {
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-on-surface-variant">Memuat data dari Supabase...</td>
                   </tr>
-                ) : classes.length > 0 ? (
-                  classes.map(cls => (
+                ) : sortedClasses.length > 0 ? (
+                  sortedClasses.map(cls => (
                     <tr key={cls.id} className="hover:bg-surface-container-low/30">
                       <td className="px-6 py-4"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold mr-1">{cls.grade_level}</span></td>
                       <td className="px-6 py-4 font-medium">

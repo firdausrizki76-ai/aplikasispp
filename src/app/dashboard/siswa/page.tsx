@@ -17,6 +17,39 @@ export default function SiswaPage() {
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const sortedStudents = [...students].sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    let aValue = a[sortConfig.key] || '';
+    let bValue = b[sortConfig.key] || '';
+
+    // Handle nested class_name
+    if (sortConfig.key === 'class_name') {
+      aValue = a.classes?.class_name || '';
+      bValue = b.classes?.class_name || '';
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return <span className="material-symbols-outlined text-[14px] ml-1 opacity-20">sort</span>;
+    return <span className="material-symbols-outlined text-[14px] ml-1 text-primary">{sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>;
+  };
+
   const [formData, setFormData] = useState<{
     nis: string;
     nama: string;
@@ -332,13 +365,25 @@ export default function SiswaPage() {
             <table className="w-full text-left border-collapse text-sm">
               <thead className="bg-surface-container-low border-b border-outline-variant">
                 <tr>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">NIS</th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Nama Lengkap</th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">No. WA Ortu</th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Jenjang</th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Kelas</th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('nis')}>
+                    <div className="flex items-center">NIS {getSortIcon('nis')}</div>
+                  </th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('name')}>
+                    <div className="flex items-center">Nama Lengkap {getSortIcon('name')}</div>
+                  </th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('parent_phone')}>
+                    <div className="flex items-center">No. WA Ortu {getSortIcon('parent_phone')}</div>
+                  </th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('grade_level')}>
+                    <div className="flex items-center">Jenjang {getSortIcon('grade_level')}</div>
+                  </th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('class_name')}>
+                    <div className="flex items-center">Kelas {getSortIcon('class_name')}</div>
+                  </th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Diskon (Rp)</th>
-                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Status</th>
+                  <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container transition-colors" onClick={() => requestSort('status')}>
+                    <div className="flex items-center">Status {getSortIcon('status')}</div>
+                  </th>
                   <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -347,8 +392,8 @@ export default function SiswaPage() {
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat data dari Supabase...</td>
                   </tr>
-                ) : students.length > 0 ? (
-                  students.map(siswa => {
+                ) : sortedStudents.length > 0 ? (
+                  sortedStudents.map(siswa => {
                     const hasDiskon = siswa.diskon && Object.keys(siswa.diskon).length > 0;
                     return (
                       <tr key={siswa.id} className="hover:bg-surface-container-low/30">
