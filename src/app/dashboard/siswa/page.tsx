@@ -131,9 +131,11 @@ export default function SiswaPage() {
           const classKey = `${className}_${jenjang}`.toLowerCase();
           const classId = classMap.get(classKey);
 
+          const studentName = row['Nama'] || row['Nama Lengkap'] || row['Nama Siswa'];
+
           return {
             nis: row['NIS']?.toString() || null,
-            name: row['Nama'],
+            name: studentName,
             grade_level: jenjang,
             class_id: classId || null,
             parent_phone: row['No WA Orang Tua']?.toString() || row['No WA']?.toString() || null,
