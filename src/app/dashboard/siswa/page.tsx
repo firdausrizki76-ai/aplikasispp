@@ -274,13 +274,21 @@ export default function SiswaPage() {
       }
     } else {
       if (confirm(`Peringatan: Menghapus permanen akan gagal jika siswa memiliki riwayat tagihan atau transaksi. Lanjutkan?`)) {
-        const { error } = await supabase.from('students').delete().eq('id', studentToDelete.id);
-        if (!error) {
+        try {
+          const res = await fetch("/api/students", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: studentToDelete.id })
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Gagal menghapus siswa");
+          
           alert("Siswa berhasil dihapus permanen.");
           fetchStudents();
           setIsDeleteModalOpen(false);
-        } else {
-          alert("Gagal menghapus permanen (mungkin karena data terikat dengan transaksi): " + error.message);
+        } catch (err: any) {
+          alert("Gagal menghapus permanen: " + err.message);
         }
       }
     }
@@ -494,17 +502,17 @@ export default function SiswaPage() {
                                   <option value={row.jenis}>{row.jenis} (Tersimpan)</option>
                                 )}
                               </select>
-                              <div className="relative w-24">
+                              <div className="relative flex-1 max-w-[200px]">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm font-medium">Rp</span>
                                 <input 
                                   type="number" 
-                                  placeholder="%" 
-                                  className="w-full px-3 py-2 border border-outline-variant rounded-lg text-sm pr-6" 
-                                  min="1" max="100" 
+                                  placeholder="0" 
+                                  className="w-full px-3 py-2 pl-9 border border-outline-variant rounded-lg text-sm" 
+                                  min="0" 
                                   value={row.persen}
                                   onChange={(e) => updateDiskonRow(row.id, 'persen', e.target.value, false)}
                                   required
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">%</span>
                               </div>
                               <button 
                                 type="button" 
@@ -641,17 +649,17 @@ export default function SiswaPage() {
                                   <option value={row.jenis}>{row.jenis} (Tersimpan)</option>
                                 )}
                               </select>
-                              <div className="relative w-24">
+                              <div className="relative flex-1 max-w-[200px]">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm font-medium">Rp</span>
                                 <input 
                                   type="number" 
-                                  placeholder="%" 
-                                  className="w-full px-3 py-2 border border-outline-variant rounded-lg text-sm pr-6" 
-                                  min="1" max="100" 
+                                  placeholder="0" 
+                                  className="w-full px-3 py-2 pl-9 border border-outline-variant rounded-lg text-sm" 
+                                  min="0" 
                                   value={row.persen}
                                   onChange={(e) => updateDiskonRow(row.id, 'persen', e.target.value, true)}
                                   required
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">%</span>
                               </div>
                               <button 
                                 type="button" 
