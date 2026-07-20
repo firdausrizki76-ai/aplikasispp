@@ -13,9 +13,23 @@ export async function POST(req: Request) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Revert bill status to Belum Lunas
+    // Fetch transaction amount securely
+    const { data: trx } = await supabaseAdmin.from('payment_transactions').select('amount').eq('id', trx_id).single();
+    if (!trx) throw new Error("Transaksi tidak ditemukan");
+
+    // Revert bill status and nominal
     if (bill_id) {
-      await supabaseAdmin.from('student_bills').update({ status: 'Belum Lunas' }).eq('id', bill_id);
+      // Fetch current bill nominal
+      const { data: bill } = await supabaseAdmin.from('student_bills').select('nominal').eq('id', bill_id).single();
+      const currentNominal = bill ? Number(bill.nominal) : 0;
+      const amountToRestore = Number(trx.amount);
+      
+      const restoredNominal = currentNominal + amountToRestore;
+      
+      await supabaseAdmin.from('student_bills').update({ 
+        status: 'Belum Lunas',
+        nominal: restoredNominal
+      }).eq('id', bill_id);
     }
 
     // Delete transaction
