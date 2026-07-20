@@ -16,6 +16,8 @@ export default function SiswaPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [bulkDeleteData, setBulkDeleteData] = useState<{ filterType: 'all'|'jenjang'|'kelas', filterValue: string }>({ filterType: 'all', filterValue: '' });
 
   // Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -330,6 +332,34 @@ export default function SiswaPage() {
     setSubmitting(false);
   };
 
+  const handleBulkDeleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (confirm(`PERINGATAN: Apakah Anda yakin ingin menghapus data siswa secara masal? Tindakan ini permanen dan akan menghapus semua riwayat tagihan & transaksi siswa tersebut!`)) {
+      setSubmitting(true);
+      try {
+        const res = await fetch("/api/bulk-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target: 'students',
+            filterType: bulkDeleteData.filterType,
+            filterValue: bulkDeleteData.filterValue
+          })
+        });
+        
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "Gagal melakukan hapus masal");
+        
+        alert(data.message || "Data siswa berhasil dihapus masal.");
+        fetchStudents();
+        setIsBulkDeleteModalOpen(false);
+      } catch (err: any) {
+        alert(err.message);
+      }
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
       <div className="view-section h-full flex flex-col">
@@ -348,6 +378,13 @@ export default function SiswaPage() {
               Import Excel
               <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
             </label>
+            <button 
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              className="bg-error hover:bg-red-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow text-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+              Hapus Masal
+            </button>
             <button 
               onClick={() => setIsAddModalOpen(true)}
               className="bg-primary hover:bg-primary-container text-on-primary px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow text-sm"
@@ -764,6 +801,76 @@ export default function SiswaPage() {
                     Batal
                   </button>
                 </div>
+            </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Hapus Masal Siswa */}
+      {isBulkDeleteModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+            <div className="bg-white rounded-xl w-full max-w-md p-8 shadow-2xl relative animate-in fade-in zoom-in duration-200 m-auto">
+                <h3 className="font-headline-md text-error mb-4 text-center tracking-tight flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-3xl">warning</span>
+                  Hapus Masal Siswa
+                </h3>
+                <p className="text-center text-on-surface-variant mb-6 text-sm">
+                  Pilih kriteria siswa yang ingin dihapus. Semua data tagihan dan transaksi milik siswa terkait akan ikut terhapus secara permanen.
+                </p>
+                <form onSubmit={handleBulkDeleteSubmit} className="space-y-4">
+                    <div>
+                        <label className="block font-label-md text-on-surface-variant mb-1">Opsi Penghapusan</label>
+                        <select 
+                          className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white"
+                          value={bulkDeleteData.filterType}
+                          onChange={(e) => setBulkDeleteData({ filterType: e.target.value as any, filterValue: '' })}
+                        >
+                            <option value="all">Hapus Semua Siswa</option>
+                            <option value="jenjang">Hapus Per Jenjang</option>
+                            <option value="kelas">Hapus Per Kelas</option>
+                        </select>
+                    </div>
+                    
+                    {bulkDeleteData.filterType === 'jenjang' && (
+                      <div>
+                          <label className="block font-label-md text-on-surface-variant mb-1">Pilih Jenjang</label>
+                          <select 
+                            className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white"
+                            required
+                            value={bulkDeleteData.filterValue}
+                            onChange={(e) => setBulkDeleteData({...bulkDeleteData, filterValue: e.target.value})}
+                          >
+                              <option value="">Pilih Jenjang</option>
+                              <option value="SD">SD</option>
+                              <option value="SMP">SMP</option>
+                          </select>
+                      </div>
+                    )}
+
+                    {bulkDeleteData.filterType === 'kelas' && (
+                      <div>
+                          <label className="block font-label-md text-on-surface-variant mb-1">Pilih Kelas</label>
+                          <select 
+                            className="w-full px-4 py-3 border border-outline-variant rounded-lg bg-white"
+                            required
+                            value={bulkDeleteData.filterValue}
+                            onChange={(e) => setBulkDeleteData({...bulkDeleteData, filterValue: e.target.value})}
+                          >
+                              <option value="">Pilih Kelas</option>
+                              {classes.map(c => (
+                                <option key={c.id} value={c.class_name}>{c.class_name}</option>
+                              ))}
+                          </select>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 mt-8 pt-4 border-t border-outline-variant">
+                        <button type="button" onClick={() => setIsBulkDeleteModalOpen(false)} className="flex-1 py-3 text-on-surface-variant font-bold hover:bg-surface-container rounded-lg transition-colors">Batal</button>
+                        <button type="submit" disabled={submitting} className="flex-1 bg-error text-white py-3 rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 transition-colors shadow">
+                          {submitting ? 'Menghapus...' : 'Hapus Data'}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>,
         document.body
