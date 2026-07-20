@@ -131,7 +131,7 @@ export default function DashboardPage() {
               <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
                 Total Pemasukan (SPP)
               </h3>
-              <div className="font-display-lg text-display-lg text-secondary truncate">
+              <div className="font-display-lg text-3xl lg:text-4xl font-black text-secondary break-words mt-1">
                 Rp {typeof totalPembayaran === 'number' ? totalPembayaran.toLocaleString("id-ID") : totalPembayaran}
               </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">
@@ -155,7 +155,7 @@ export default function DashboardPage() {
               <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
                 Tunggakan Berjalan
               </h3>
-              <div className="font-display-lg text-display-lg text-error truncate">
+              <div className="font-display-lg text-3xl lg:text-4xl font-black text-error break-words mt-1">
                 Rp {typeof totalTunggakan === 'number' ? totalTunggakan.toLocaleString("id-ID") : totalTunggakan}
               </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">
