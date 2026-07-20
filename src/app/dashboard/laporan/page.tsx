@@ -19,6 +19,7 @@ export default function LaporanPage() {
     percentLunasSD: 0,
     percentLunasSMP: 0
   });
+  const [classStats, setClassStats] = useState<Record<string, { total: number, lunas: number, jenjang: string }>>({});
   
   // Date range filters
   const [startDate, setStartDate] = useState("");
@@ -75,9 +76,13 @@ export default function LaporanPage() {
       let sdBillsLunas = 0;
       let smpBillsLunas = 0;
       
+      const newClassStats: Record<string, { total: number, lunas: number, jenjang: string }> = {};
+
       bills.forEach((b: any) => {
-        const gl = (b.students as any)?.grade_level?.toUpperCase() || "";
+        const gl = (b.students as any)?.classes?.grade_level?.toUpperCase() || (b.students as any)?.grade_level?.toUpperCase() || "";
+        const className = (b.students as any)?.classes?.class_name || (b.students as any)?.class_name || "Tanpa Kelas";
         const isLunas = b.status?.toLowerCase() === 'lunas';
+
         if (gl.includes("SD")) {
           sdBillsTotal++;
           if (isLunas) sdBillsLunas++;
@@ -86,7 +91,15 @@ export default function LaporanPage() {
           smpBillsTotal++;
           if (isLunas) smpBillsLunas++;
         }
+
+        if (!newClassStats[className]) {
+          newClassStats[className] = { total: 0, lunas: 0, jenjang: gl.includes("SD") ? "SD" : gl.includes("SMP") ? "SMP" : "Lainnya" };
+        }
+        newClassStats[className].total++;
+        if (isLunas) newClassStats[className].lunas++;
       });
+
+      setClassStats(newClassStats);
 
       setStats({
         totalSD: sdBillsTotal,
@@ -548,12 +561,52 @@ export default function LaporanPage() {
 
         {/* Ringkasan Download */}
         <div className="bg-gradient-to-br from-primary to-primary-container p-6 rounded-xl shadow-sm text-white flex flex-col justify-center items-center text-center">
-          <span className="material-symbols-outlined text-4xl mb-2 text-white/80">summarize</span>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-white/90">Pusat Laporan</h3>
-          <p className="text-xs text-white/70 mt-2">Unduh laporan keuangan di bawah ini untuk analisis mendalam.</p>
+          <span className="material-symbols-outlined text-[40px] mb-3 opacity-90">analytics</span>
+          <h3 className="font-bold text-lg">Pusat Laporan</h3>
+          <p className="text-xs text-blue-100 mt-2 leading-relaxed">Unduh laporan keuangan di bawah ini untuk analisis mendalam.</p>
         </div>
       </div>
       
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant mb-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">Persentase Lunas Per Kelas</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Object.keys(classStats).sort().map(className => {
+            const stat = classStats[className];
+            const percent = stat.total > 0 ? Math.round((stat.lunas / stat.total) * 100) : 0;
+            return (
+              <div key={className} className="border border-gray-100 rounded-lg p-4 hover:shadow-md transition-all">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 className="font-bold text-gray-700">{className}</h4>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{stat.jenjang}</span>
+                  </div>
+                  <span className={`text-lg font-black ${percent >= 80 ? 'text-green-600' : percent >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>
+                    {percent}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                  <div className={`h-1.5 rounded-full ${percent >= 80 ? 'bg-green-500' : percent >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${percent}%` }}></div>
+                </div>
+                <div className="text-xs text-gray-500 flex justify-between">
+                  <span>Lunas: {stat.lunas}</span>
+                  <span>Total Tagihan: {stat.total}</span>
+                </div>
+              </div>
+            );
+          })}
+          {Object.keys(classStats).length === 0 && !loading && (
+            <div className="col-span-full py-8 text-center text-gray-400 text-sm">
+              Tidak ada data tagihan pada periode ini.
+            </div>
+          )}
+          {loading && (
+            <div className="col-span-full py-8 text-center text-gray-400 text-sm">
+              Memuat data kelas...
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-outline-variant flex items-center justify-center p-8 text-center text-gray-500">
         <div>
           <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">analytics</span>

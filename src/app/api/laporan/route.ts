@@ -49,18 +49,23 @@ export async function GET(request: Request) {
       .gte('created_at', `${startDate}T00:00:00Z`)
       .lte('created_at', `${endDate}T23:59:59Z`);
 
-    // 3. Fetch students count
-    const { count: countSD } = await supabaseAdmin.from('students').select('*', { count: 'exact', head: true })
-      .eq('status', 'aktif').ilike('grade_level', '%SD%');
-    const { count: countSMP } = await supabaseAdmin.from('students').select('*', { count: 'exact', head: true })
-      .eq('status', 'aktif').ilike('grade_level', '%SMP%');
-
-    // 4. Fetch students for report generation
+    // 3. Fetch students for report generation
     const { data: students } = await supabaseAdmin.from('students')
-      .select('id, name, class_name, grade_level, classes(class_name, grade_level)')
+      .select('id, name, class_name, grade_level, status, classes(class_name, grade_level)')
       .order('name');
 
-    // 5. Fetch master tagihan
+    // Count SD and SMP students
+    let countSD = 0;
+    let countSMP = 0;
+    (students || []).forEach(s => {
+      if (s.status === 'aktif') {
+        const gl = (s.classes as any)?.grade_level || s.grade_level || "";
+        if (gl.toUpperCase().includes('SD')) countSD++;
+        else if (gl.toUpperCase().includes('SMP')) countSMP++;
+      }
+    });
+
+    // 4. Fetch master tagihan
     const { data: master_tagihan } = await supabaseAdmin.from('master_tagihan').select('nama_tagihan');
 
     return NextResponse.json({
