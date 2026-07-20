@@ -38,23 +38,29 @@ export default function TunggakanPage() {
   const [editBillNominal, setEditBillNominal] = useState<string>("");
 
   const handleSaveBillEdit = async (billId: string) => {
-    const supabase = createClient();
-    
     const nominalValue = Number(editBillNominal) || 0;
     
     // Jika 0, set status jadi Lunas agar dianggap bebas/diskon 100%
     const status = nominalValue <= 0 ? 'Lunas' : 'Belum Lunas';
     
-    const { error } = await supabase.from('student_bills')
-      .update({ nominal: nominalValue, status })
-      .eq('id', billId);
+    try {
+      const res = await fetch('/api/bills/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billId, nominal: nominalValue, status })
+      });
       
-    if (!error) {
-      setEditingBillId(null);
-      setSelectedStudent(null);
-      fetchArrears();
-    } else {
-      alert("Gagal menyimpan perubahan: " + error.message);
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setEditingBillId(null);
+        setSelectedStudent(null);
+        fetchArrears();
+      } else {
+        alert("Gagal menyimpan perubahan: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Gagal memproses request: " + err.message);
     }
   };
 

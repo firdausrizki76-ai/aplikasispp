@@ -159,11 +159,23 @@ export default function PembayaranPage() {
       if (txError) throw txError;
 
       // 3. Update student_bills status to Lunas if fully paid, otherwise reduce nominal
-      for (const bill of billsToPay) {
+      const billUpdates = billsToPay.map(bill => {
         const payAmount = selectedBillsToPay[bill.id];
         const newNominal = bill.nominal - payAmount;
         const status = newNominal <= 0 ? "Lunas" : "Belum Lunas";
-        await supabase.from("student_bills").update({ status, nominal: newNominal }).eq("id", bill.id);
+        return { billId: bill.id, nominal: newNominal, status };
+      });
+      
+      if (billUpdates.length > 0) {
+        const res = await fetch('/api/bills/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(billUpdates)
+        });
+        const updateData = await res.json();
+        if (!res.ok || !updateData.success) {
+          throw new Error("Gagal mengupdate status tagihan: " + (updateData.error || ""));
+        }
       }
 
       alert("Pembayaran berhasil dicatat!");
