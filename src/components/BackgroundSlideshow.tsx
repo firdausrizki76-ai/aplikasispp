@@ -13,7 +13,7 @@ export default function BackgroundSlideshow({ className = "bg-cover bg-center bg
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % images.length);
-    }, 5000);
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
