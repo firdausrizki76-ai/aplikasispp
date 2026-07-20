@@ -122,12 +122,20 @@ export default function SeragamPage() {
   };
 
   const handleDeleteSale = async (sale: any) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus riwayat penjualan ${sale.item_name} kepada ${sale.students?.name || 'Siswa'}? Stok akan dikembalikan.`)) {
+    if (confirm(`Apakah Anda yakin ingin membatalkan transaksi penjualan ${sale.quantity}x ${sale.item_name}? Stok akan dikembalikan.`)) {
       try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
         const res = await fetch('/api/seragam/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sale_id: sale.id, item_name: sale.item_name, quantity: sale.quantity })
+          body: JSON.stringify({ 
+            sale_id: sale.id, 
+            item_name: sale.item_name, 
+            quantity: sale.quantity,
+            userId: user?.id
+          })
         });
         
         const data = await res.json();

@@ -13,11 +13,9 @@ export async function GET() {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Optimize by running all queries in parallel
+    // Optimize by running parallel requests
     const [
       { count: totalSiswa },
-      { data: payments },
-      { data: unpaidBills },
       { data: auditLogs }
     ] = await Promise.all([
       // Total Siswa
@@ -25,15 +23,6 @@ export async function GET() {
         .from("students")
         .select("*", { count: "exact", head: true })
         .eq("status", "aktif"),
-      // Total Pemasukan
-      supabase
-        .from("payment_transactions")
-        .select("amount"),
-      // Total Tunggakan
-      supabase
-        .from("student_bills")
-        .select("nominal")
-        .eq("status", "Belum Lunas"),
       // Audit Logs
       supabase
         .from("audit_logs")
@@ -42,8 +31,37 @@ export async function GET() {
         .limit(5)
     ]);
 
-    const totalPembayaran = (payments || []).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-    const totalTunggakan = (unpaidBills || []).reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
+    // Calculate total pembayaran (loop pagination)
+    let totalPembayaran = 0;
+    let paymentsFrom = 0;
+    const step = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from("payment_transactions")
+        .select("amount")
+        .range(paymentsFrom, paymentsFrom + step - 1);
+        
+      if (error || !data) break;
+      totalPembayaran += data.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      if (data.length < step) break;
+      paymentsFrom += step;
+    }
+
+    // Calculate total tunggakan (loop pagination)
+    let totalTunggakan = 0;
+    let tunggakanFrom = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("student_bills")
+        .select("nominal")
+        .eq("status", "Belum Lunas")
+        .range(tunggakanFrom, tunggakanFrom + step - 1);
+        
+      if (error || !data) break;
+      totalTunggakan += data.reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
+      if (data.length < step) break;
+      tunggakanFrom += step;
+    }
 
     return NextResponse.json({
       totalSiswa: totalSiswa || 0,

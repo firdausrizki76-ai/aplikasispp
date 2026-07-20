@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { insertAuditLog } from '@/utils/audit';
 
 export async function POST(req: Request) {
   try {
-    const { trx_id, bill_id } = await req.json();
+    const { trx_id, bill_id, userId } = await req.json();
     
     if (!trx_id) {
       return NextResponse.json({ error: "ID Transaksi diperlukan" }, { status: 400 });
@@ -39,6 +40,16 @@ export async function POST(req: Request) {
     // Delete transaction
     const { error } = await supabaseAdmin.from('payment_transactions').delete().eq('id', trx_id);
     if (error) throw error;
+
+    if (userId) {
+      await insertAuditLog(
+        supabaseAdmin,
+        userId,
+        "Hapus Transaksi Harian",
+        "payment_transactions",
+        `Membatalkan/menghapus transaksi sebesar Rp ${trx.amount}`
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

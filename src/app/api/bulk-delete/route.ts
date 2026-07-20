@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
+import { insertAuditLog } from '@/utils/audit';
 
 export async function POST(request: Request) {
   try {
@@ -47,12 +48,19 @@ export async function POST(request: Request) {
     const { error } = await query;
 
     if (error) {
-      // If it's a foreign key constraint error when deleting classes, throw a specific message
       if (error.code === '23503') {
         return NextResponse.json({ success: false, error: "Gagal: Masih ada data yang bergantung pada data ini (Pastikan kelas yang ingin dihapus sudah kosong dari siswa)." }, { status: 400 });
       }
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    await insertAuditLog(
+      supabaseAdmin,
+      user.id,
+      "Hapus Data Masal",
+      target,
+      `Menghapus data ${target} dengan filter ${filterType} = ${filterValue || 'Semua'}`
+    );
 
     return NextResponse.json({ success: true, message: `Data ${target} berhasil dihapus secara masal.` });
 

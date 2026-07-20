@@ -27,7 +27,7 @@ export default function LaporanPage() {
   // Download Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">("excel");
-  const [downloadType, setDownloadType] = useState<"SD" | "SMP" | "SERAGAM_SD" | "SERAGAM_SMP">("SD");
+  const [downloadType, setDownloadType] = useState<"SD" | "SMP" | "SERAGAM_SD" | "SERAGAM_SMP" | "PERSENTASE_SD" | "PERSENTASE_SMP">("SD");
   const [downloading, setDownloading] = useState(false);
 
   const generateTahunAjaranOptions = () => {
@@ -61,71 +61,48 @@ export default function LaporanPage() {
     if (!startDate || !endDate) return;
     
     setLoading(true);
-    const supabase = createClient();
-    
-    // Just fetch some basic stats to show on the dashboard UI based on dates
-    let allBills: any[] = [];
-    let from = 0;
-    const step = 1000;
-    
-    while (true) {
-      const { data, error } = await supabase.from('student_bills')
-        .select('*, students!inner(grade_level)')
-        .gte('created_at', `${startDate}T00:00:00Z`)
-        .lte('created_at', `${endDate}T23:59:59Z`)
-        .range(from, from + step - 1);
-        
-      if (error) break;
-      if (data) {
-        allBills = [...allBills, ...data];
-        if (data.length < step) break;
-      } else {
-        break;
-      }
-      from += step;
-    }
-    const bills = allBills;
+    try {
+      const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+      if (!res.ok) throw new Error("Gagal mengambil data laporan");
+      const data = await res.json();
       
-    const { data: sales } = await supabase.from('sales')
-      .select('*')
-      .gte('created_at', `${startDate}T00:00:00Z`)
-      .lte('created_at', `${endDate}T23:59:59Z`);
+      const bills = data.bills || [];
+      const sales = data.sales || [];
+      const { SD: countSD, SMP: countSMP } = data.counts || { SD: 0, SMP: 0 };
 
-    // Get student counts
-    const { count: countSD } = await supabase.from('students').select('*', { count: 'exact', head: true })
-      .eq('status', 'aktif').ilike('grade_level', '%SD%');
-    const { count: countSMP } = await supabase.from('students').select('*', { count: 'exact', head: true })
-      .eq('status', 'aktif').ilike('grade_level', '%SMP%');
+      let sdBillsTotal = 0;
+      let smpBillsTotal = 0;
+      let sdBillsLunas = 0;
+      let smpBillsLunas = 0;
+      
+      bills.forEach((b: any) => {
+        const gl = (b.students as any)?.grade_level?.toUpperCase() || "";
+        const isLunas = b.status?.toLowerCase() === 'lunas';
+        if (gl.includes("SD")) {
+          sdBillsTotal++;
+          if (isLunas) sdBillsLunas++;
+        }
+        else if (gl.includes("SMP")) {
+          smpBillsTotal++;
+          if (isLunas) smpBillsLunas++;
+        }
+      });
 
-    let sdBillsTotal = 0;
-    let smpBillsTotal = 0;
-    let sdBillsLunas = 0;
-    let smpBillsLunas = 0;
-    
-    (bills || []).forEach(b => {
-      const gl = (b.students as any)?.grade_level?.toUpperCase() || "";
-      const isLunas = b.status?.toLowerCase() === 'lunas';
-      if (gl.includes("SD")) {
-        sdBillsTotal++;
-        if (isLunas) sdBillsLunas++;
-      }
-      else if (gl.includes("SMP")) {
-        smpBillsTotal++;
-        if (isLunas) smpBillsLunas++;
-      }
-    });
-
-    setStats({
-      totalSD: sdBillsTotal,
-      totalSMP: smpBillsTotal,
-      totalSeragam: sales?.length || 0,
-      studentsSD: countSD || 0,
-      studentsSMP: countSMP || 0,
-      percentLunasSD: sdBillsTotal > 0 ? Math.round((sdBillsLunas / sdBillsTotal) * 100) : 0,
-      percentLunasSMP: smpBillsTotal > 0 ? Math.round((smpBillsLunas / smpBillsTotal) * 100) : 0
-    });
-
-    setLoading(false);
+      setStats({
+        totalSD: sdBillsTotal,
+        totalSMP: smpBillsTotal,
+        totalSeragam: sales.length,
+        studentsSD: countSD,
+        studentsSMP: countSMP,
+        percentLunasSD: sdBillsTotal > 0 ? Math.round((sdBillsLunas / sdBillsTotal) * 100) : 0,
+        percentLunasSMP: smpBillsTotal > 0 ? Math.round((smpBillsLunas / smpBillsTotal) * 100) : 0
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Terjadi kesalahan saat memuat laporan.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -162,6 +139,8 @@ export default function LaporanPage() {
     try {
       if (downloadType === "SERAGAM_SD" || downloadType === "SERAGAM_SMP") {
         await generateSeragamReport(downloadType === "SERAGAM_SD" ? "SD" : "SMP");
+      } else if (downloadType === "PERSENTASE_SD" || downloadType === "PERSENTASE_SMP") {
+        await generatePersentaseReport(downloadType === "PERSENTASE_SD" ? "SD" : "SMP");
       } else {
         await generateSekolahReport(downloadType);
       }
@@ -175,43 +154,25 @@ export default function LaporanPage() {
   };
 
   const generateSekolahReport = async (jenjang: "SD" | "SMP") => {
-    const supabase = createClient();
+    // Fetch all required data from API to bypass RLS
+    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+    if (!res.ok) throw new Error("Gagal mengambil data untuk laporan");
+    const data = await res.json();
     
-    // Fetch all required data
-    const { data: students } = await supabase.from('students')
-      .select('id, name, classes!inner(class_name, grade_level)')
-      .eq('classes.grade_level', jenjang)
-      .order('name');
-      
-    let allBillsReport: any[] = [];
-    let from = 0;
-    const step = 1000;
-    
-    while (true) {
-      const { data, error } = await supabase.from('student_bills')
-        .select('*, payment_transactions(payment_date)')
-        .gte('created_at', `${startDate}T00:00:00Z`)
-        .lte('created_at', `${endDate}T23:59:59Z`)
-        .range(from, from + step - 1);
-        
-      if (error) break;
-      if (data) {
-        allBillsReport = [...allBillsReport, ...data];
-        if (data.length < step) break;
-      } else {
-        break;
-      }
-      from += step;
-    }
-    const bills = allBillsReport;
+    // Filter students by jenjang
+    const students = (data.students || []).filter((s: any) => {
+      const gl = s.classes?.grade_level || s.grade_level || "";
+      return gl.includes(jenjang);
+    });
 
-    const { data: master } = await supabase.from('master_tagihan').select('nama_tagihan');
+    const bills = data.bills || [];
+    const master = data.master_tagihan || [];
     
-    const tagihanTypes = (master || []).map(m => m.nama_tagihan).filter(t => t.toLowerCase() !== 'uang psb');
+    const tagihanTypes = (master || []).map((m: any) => m.nama_tagihan).filter((t: string) => t.toLowerCase() !== 'uang psb');
     
     // Unique months present in the bills
     const monthsSet = new Set<string>();
-    (bills || []).forEach(b => {
+    (bills || []).forEach((b: any) => {
       if (b.bulan_tagihan) monthsSet.add(b.bulan_tagihan);
     });
     
@@ -364,13 +325,13 @@ export default function LaporanPage() {
   };
 
   const generateSeragamReport = async (jenjang: "SD" | "SMP") => {
-    const supabase = createClient();
-    const { data: salesRaw } = await supabase.from('sales').select('*, students(name, classes(grade_level))')
-      .gte('created_at', `${startDate}T00:00:00Z`)
-      .lte('created_at', `${endDate}T23:59:59Z`);
+    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+    if (!res.ok) throw new Error("Gagal mengambil data untuk laporan");
+    const data = await res.json();
+    const salesRaw = data.sales || [];
 
     // Filter by jenjang
-    const sales = (salesRaw || []).filter(s => {
+    const sales = (salesRaw || []).filter((s: any) => {
       const gl = (s.students as any)?.classes?.grade_level || "";
       return gl === jenjang;
     });
@@ -381,7 +342,7 @@ export default function LaporanPage() {
         ["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)"]
       ];
       
-      (sales || []).forEach(s => {
+      (sales || []).forEach((s: any) => {
         const pembeli = s.buyer_name || (s.students as any)?.name || "Anonim";
         wsData.push([
           new Date(s.created_at).toLocaleDateString('id-ID'),
@@ -393,6 +354,11 @@ export default function LaporanPage() {
       });
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // Auto width
+      const colWidths = wsData[1].map((_, i) => ({ wch: Math.max(...wsData.map(row => row[i] ? row[i].toString().length : 0)) }));
+      ws['!cols'] = colWidths;
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Seragam");
       XLSX.writeFile(wb, `Laporan_Seragam_${jenjang}.xlsx`);
@@ -401,7 +367,7 @@ export default function LaporanPage() {
       doc.text(`Laporan Transaksi Seragam ${jenjang}`, 14, 15);
       doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 22);
       
-      const body = (sales || []).map(s => {
+      const body = (sales || []).map((s: any) => {
         const pembeli = s.buyer_name || (s.students as any)?.name || "Anonim";
         return [
           new Date(s.created_at).toLocaleDateString('id-ID'),
@@ -420,6 +386,70 @@ export default function LaporanPage() {
       });
       doc.save(`Laporan_Seragam_${jenjang}.pdf`);
     }
+  };
+
+  const generatePersentaseReport = async (jenjang: "SD" | "SMP") => {
+    if (downloadFormat !== "excel") {
+      alert("Laporan Persentase Kelas hanya tersedia dalam format Excel.");
+      return;
+    }
+
+    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+    if (!res.ok) throw new Error("Gagal mengambil data untuk laporan");
+    const data = await res.json();
+    
+    // Aggregate bills by class
+    const bills = data.bills || [];
+    
+    // Count total and paid per class
+    const classStats: Record<string, { total: number, lunas: number }> = {};
+
+    bills.forEach((b: any) => {
+      const gl = b.students?.grade_level || "";
+      if (gl.includes(jenjang)) {
+        const className = b.students?.classes?.class_name || "Tanpa Kelas";
+        if (!classStats[className]) classStats[className] = { total: 0, lunas: 0 };
+        
+        classStats[className].total += 1;
+        if (b.status?.toLowerCase() === 'lunas') {
+          classStats[className].lunas += 1;
+        }
+      }
+    });
+
+    const wsData: any[][] = [];
+    wsData.push([`Laporan Persentase Pembayaran: ${jenjang} T.A. ${selectedTA}`]);
+    wsData.push(["Kelas", "Total Tagihan", "Tagihan Lunas", "Belum Lunas", "Persentase Lunas"]);
+
+    const sortedClasses = Object.keys(classStats).sort();
+    
+    sortedClasses.forEach(className => {
+      const stat = classStats[className];
+      const percent = stat.total > 0 ? (stat.lunas / stat.total) * 100 : 0;
+      wsData.push([
+        className,
+        stat.total,
+        stat.lunas,
+        stat.total - stat.lunas,
+        `${percent.toFixed(2)}%`
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Auto width
+    const colWidths = [
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 18 }
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Persentase");
+    XLSX.writeFile(wb, `Persentase_Pembayaran_${jenjang}.xlsx`);
   };
 
   return (
@@ -554,6 +584,8 @@ export default function LaporanPage() {
                   <option value="SMP">Rekap Pembayaran Sekolah: SMP</option>
                   <option value="SERAGAM_SD">Rekap Transaksi Seragam & Stok: SD</option>
                   <option value="SERAGAM_SMP">Rekap Transaksi Seragam & Stok: SMP</option>
+                  <option value="PERSENTASE_SD">Laporan Persentase Pembayaran Kelas: SD</option>
+                  <option value="PERSENTASE_SMP">Laporan Persentase Pembayaran Kelas: SMP</option>
                 </select>
               </div>
 

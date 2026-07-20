@@ -46,10 +46,18 @@ export default function TunggakanPage() {
     const status = nominalValue <= 0 ? 'Lunas' : 'Belum Lunas';
     
     try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
       const res = await fetch('/api/bills/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ billId, nominal: nominalValue, status })
+        body: JSON.stringify({ 
+          billId, 
+          nominal: nominalValue, 
+          status,
+          userId: user?.id,
+          actionDetails: `Mengubah nominal tagihan menjadi Rp ${nominalValue.toLocaleString('id-ID')}`
+        })
       });
       
       const data = await res.json();

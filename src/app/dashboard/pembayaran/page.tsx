@@ -165,12 +165,17 @@ export default function PembayaranPage() {
         const status = newNominal <= 0 ? "Lunas" : "Belum Lunas";
         return { billId: bill.id, nominal: newNominal, status };
       });
-      
       if (billUpdates.length > 0) {
+        const payload = {
+          updates: billUpdates,
+          userId: user?.id,
+          actionDetails: `Menerima pembayaran untuk ${billUpdates.length} tagihan siswa ${selectedStudent.name}`
+        };
+
         const res = await fetch('/api/bills/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(billUpdates)
+          body: JSON.stringify(payload)
         });
         const updateData = await res.json();
         if (!res.ok || !updateData.success) {

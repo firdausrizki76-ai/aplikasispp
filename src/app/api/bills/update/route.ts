@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { insertAuditLog } from '@/utils/audit';
 
 // Initialize Supabase Admin client to bypass RLS
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -11,7 +12,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     // Support for multiple bill updates or a single update
-    const updates = Array.isArray(body) ? body : [body];
+    const { updates: payloadUpdates, userId, actionDetails } = body;
+    const updates = Array.isArray(body) ? body : (payloadUpdates || [body]);
 
     if (updates.length === 0) {
       return NextResponse.json({ success: true, message: 'Tidak ada tagihan yang diupdate' });
@@ -30,6 +32,16 @@ export async function POST(request: Request) {
       if (error) {
         throw new Error(error.message);
       }
+    }
+
+    if (userId) {
+      await insertAuditLog(
+        supabaseAdmin, 
+        userId, 
+        "Update Tagihan", 
+        "student_bills", 
+        actionDetails || `Mengubah ${updates.length} tagihan`
+      );
     }
 
     return NextResponse.json({ success: true, message: 'Tagihan berhasil diupdate' });

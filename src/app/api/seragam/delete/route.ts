@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { insertAuditLog } from '@/utils/audit';
 
 export async function POST(req: Request) {
   try {
-    const { sale_id, item_name, quantity } = await req.json();
+    const { sale_id, item_name, quantity, userId } = await req.json();
     
     if (!sale_id || !item_name || !quantity) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
@@ -22,6 +23,15 @@ export async function POST(req: Request) {
     if (item) {
       const newStock = item.stock_quantity + parseInt(quantity);
       await supabaseAdmin.from('inventory').update({ stock_quantity: newStock }).eq('id', item.id);
+    }
+    if (userId) {
+      await insertAuditLog(
+        supabaseAdmin,
+        userId,
+        "Hapus Transaksi Seragam/Buku",
+        "sales",
+        `Membatalkan/menghapus transaksi ${quantity} x ${item_name}`
+      );
     }
 
     return NextResponse.json({ success: true });

@@ -42,10 +42,12 @@ export default function HarianPage() {
   const handleDeleteTransaction = async (trx: any) => {
     if (confirm(`Apakah Anda yakin ingin menghapus transaksi ${trx.receipt_id} sebesar Rp ${trx.amount.toLocaleString('id-ID')}? \n\nPERHATIAN: Tagihan untuk transaksi ini akan dikembalikan menjadi 'Belum Lunas'.`)) {
       try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
         const res = await fetch('/api/harian/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trx_id: trx.id, bill_id: trx.bill_id })
+          body: JSON.stringify({ trx_id: trx.id, bill_id: trx.bill_id, userId: user?.id })
         });
         
         const data = await res.json();
