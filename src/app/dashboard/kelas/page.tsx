@@ -521,10 +521,10 @@ export default function KelasPage() {
             
             <div className="p-5 border-t border-outline-variant bg-surface-container-low flex justify-between items-center">
               <Link href="/dashboard/tunggakan" onClick={() => setIsArrearsModalOpen(false)}>
-                <button className="text-primary hover:text-primary-container font-bold flex items-center gap-2 text-sm hover:underline">
+                <div className="text-primary hover:text-primary-container font-bold flex items-center gap-2 text-sm hover:underline cursor-pointer">
                   Lihat Detail Tunggakan
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </button>
+                </div>
               </Link>
               <button 
                 onClick={() => setIsArrearsModalOpen(false)}
