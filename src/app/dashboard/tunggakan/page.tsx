@@ -22,6 +22,17 @@ export default function TunggakanPage() {
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<ArrearsSummary | null>(null);
 
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   // Edit Bill State
   const [editingBillId, setEditingBillId] = useState<string | null>(null);
   const [editBillNominal, setEditBillNominal] = useState<string>("");
@@ -159,6 +170,49 @@ export default function TunggakanPage() {
     return true;
   });
 
+  const sortedData = [...filteredData].sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    let aValue: any;
+    let bValue: any;
+    
+    switch (sortConfig.key) {
+      case 'jenjang':
+        aValue = a.student.grade_level;
+        bValue = b.student.grade_level;
+        break;
+      case 'nama':
+        aValue = a.student.name;
+        bValue = b.student.name;
+        break;
+      case 'kelas':
+        aValue = a.student.classes?.class_name || (a.student as any).class_name || '';
+        bValue = b.student.classes?.class_name || (b.student as any).class_name || '';
+        break;
+      case 'lama':
+        aValue = a.totalUnpaidBills;
+        bValue = b.totalUnpaidBills;
+        break;
+      case 'total':
+        aValue = a.totalArrears;
+        bValue = b.totalArrears;
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const getSortIcon = (key: string) => {
+    if (sortConfig?.key !== key) return <span className="material-symbols-outlined text-[16px] text-gray-300">swap_vert</span>;
+    return sortConfig.direction === 'asc' 
+      ? <span className="material-symbols-outlined text-[16px] text-primary">arrow_upward</span>
+      : <span className="material-symbols-outlined text-[16px] text-primary">arrow_downward</span>;
+  };
+
   return (
     <div className="view-section">
       <div className="mb-8 flex justify-between items-end">
@@ -196,11 +250,21 @@ export default function TunggakanPage() {
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-surface-container-low border-b border-outline-variant">
               <tr>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Jenjang</th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Nama Siswa</th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Kelas</th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Lama Menunggak</th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Total Tunggakan</th>
+                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('jenjang')}>
+                  <div className="flex items-center gap-2">Jenjang {getSortIcon('jenjang')}</div>
+                </th>
+                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('nama')}>
+                  <div className="flex items-center gap-2">Nama Siswa {getSortIcon('nama')}</div>
+                </th>
+                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('kelas')}>
+                  <div className="flex items-center gap-2">Kelas {getSortIcon('kelas')}</div>
+                </th>
+                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('lama')}>
+                  <div className="flex items-center gap-2">Lama Menunggak {getSortIcon('lama')}</div>
+                </th>
+                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('total')}>
+                  <div className="flex items-center gap-2">Total Tunggakan {getSortIcon('total')}</div>
+                </th>
                 <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Keterangan</th>
                 <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Tindakan</th>
               </tr>
@@ -208,10 +272,10 @@ export default function TunggakanPage() {
             <tbody className="divide-y divide-outline-variant text-on-surface">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-on-surface-variant">Memuat data dari database...</td>
+                  <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat data dari database...</td>
                 </tr>
-              ) : filteredData.length > 0 ? (
-                filteredData.map(d => (
+              ) : sortedData.length > 0 ? (
+                sortedData.map(d => (
                   <tr key={d.student.id} className="hover:bg-surface-container-low/30">
                     <td className="px-6 py-4">
                       <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold mr-1">{d.student.grade_level}</span>
@@ -260,7 +324,7 @@ export default function TunggakanPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
+                  <td colSpan={7} className="p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
                       <span className="material-symbols-outlined text-3xl text-green-600">done_all</span>
                     </div>
