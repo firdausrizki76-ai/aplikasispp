@@ -63,9 +63,21 @@ export default function LaporanPage() {
     
     setLoading(true);
     try {
-      const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
-      if (!res.ok) throw new Error("Gagal mengambil data laporan");
-      const data = await res.json();
+      const cacheKey = `laporan_cache_${startDate}_${endDate}`;
+      let data = null;
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) data = JSON.parse(cached);
+      } catch (e) {}
+
+      if (!data) {
+        const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+        if (!res.ok) throw new Error("Gagal mengambil data laporan");
+        data = await res.json();
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        } catch (e) {}
+      }
       
       const bills = data.bills || [];
       const sales = data.sales || [];
@@ -600,8 +612,10 @@ export default function LaporanPage() {
             </div>
           )}
           {loading && (
-            <div className="col-span-full py-8 text-center text-gray-400 text-sm">
-              Memuat data kelas...
+            <div className="col-span-full py-12 text-center flex flex-col items-center justify-center">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
+              <p className="text-gray-500 font-medium">Memuat data, silakan tunggu...</p>
+              <p className="text-xs text-gray-400 mt-1">Mengambil ribuan data transaksi...</p>
             </div>
           )}
         </div>

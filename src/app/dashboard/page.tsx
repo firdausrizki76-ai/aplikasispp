@@ -29,9 +29,21 @@ export default function DashboardPage() {
       }
 
       try {
-        const response = await fetch('/api/dashboard');
-        if (response.ok) {
-          const data = await response.json();
+        let data = null;
+        try {
+          const cached = sessionStorage.getItem('dashboard_cache');
+          if (cached) data = JSON.parse(cached);
+        } catch (e) {}
+
+        if (!data) {
+          const response = await fetch('/api/dashboard');
+          if (response.ok) {
+            data = await response.json();
+            try { sessionStorage.setItem('dashboard_cache', JSON.stringify(data)); } catch (e) {}
+          }
+        }
+        
+        if (data) {
           setTotalSiswa(data.totalSiswa);
           setTotalPembayaran(data.totalPembayaran);
           setTotalTunggakan(data.totalTunggakan);
@@ -131,7 +143,7 @@ export default function DashboardPage() {
               <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
                 Total Pemasukan (SPP)
               </h3>
-              <div className="font-display-lg text-3xl lg:text-4xl font-black text-secondary break-words mt-1">
+              <div className="text-2xl lg:text-3xl font-black text-secondary break-words mt-1">
                 Rp {typeof totalPembayaran === 'number' ? totalPembayaran.toLocaleString("id-ID") : totalPembayaran}
               </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">
@@ -155,7 +167,7 @@ export default function DashboardPage() {
               <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
                 Tunggakan Berjalan
               </h3>
-              <div className="font-display-lg text-3xl lg:text-4xl font-black text-error break-words mt-1">
+              <div className="text-2xl lg:text-3xl font-black text-error break-words mt-1">
                 Rp {typeof totalTunggakan === 'number' ? totalTunggakan.toLocaleString("id-ID") : totalTunggakan}
               </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">
