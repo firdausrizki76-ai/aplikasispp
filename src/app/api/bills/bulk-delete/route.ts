@@ -16,38 +16,30 @@ export async function POST(request: Request) {
     }
       
     // Only delete 'Belum Lunas' to prevent deleting paid bills
-    let query = supabaseAdmin
+    let deleteQuery = supabaseAdmin
       .from('student_bills')
-      .select('id')
+      .delete()
       .eq('jenis_tagihan', jenis_tagihan)
       .eq('status', 'Belum Lunas');
       
     if (bulan_tagihan === 'all') {
       if (!tahun) return NextResponse.json({ success: false, error: 'Tahun harus diisi' }, { status: 400 });
-      query = query.ilike('bulan_tagihan', `%${tahun}%`);
+      deleteQuery = deleteQuery.ilike('bulan_tagihan', `%${tahun}%`);
     } else {
-      query = query.eq('bulan_tagihan', bulan_tagihan);
+      deleteQuery = deleteQuery.eq('bulan_tagihan', bulan_tagihan);
     }
       
-    const { data: billsToDelete, error: fetchError } = await query;
-      
-    if (fetchError) throw new Error(fetchError.message);
-    
-    if (!billsToDelete || billsToDelete.length === 0) {
-      return NextResponse.json({ success: true, message: 'Tidak ada tagihan Belum Lunas yang ditemukan untuk kriteria tersebut', count: 0 });
-    }
-    
-    const idsToDelete = billsToDelete.map(b => b.id);
-    
-    // Delete in chunks if very large, but single delete is fine for thousands usually
-    const { error: deleteError } = await supabaseAdmin
-      .from('student_bills')
-      .delete()
-      .in('id', idsToDelete);
+    const { data: deletedBills, error: deleteError } = await deleteQuery.select('id');
       
     if (deleteError) {
       throw new Error(deleteError.message);
     }
+    
+    if (!deletedBills || deletedBills.length === 0) {
+      return NextResponse.json({ success: true, message: 'Tidak ada tagihan Belum Lunas yang ditemukan untuk kriteria tersebut', count: 0 });
+    }
+    
+    const count = deletedBills.length;
 
     if (userId) {
       await insertAuditLog(
@@ -55,11 +47,11 @@ export async function POST(request: Request) {
         userId, 
         "Hapus Tagihan Masal", 
         "student_bills", 
-        `Menghapus ${idsToDelete.length} tagihan ${jenis_tagihan} untuk ${bulan_tagihan === 'all' ? `Tahun ${tahun}` : bulan_tagihan}`
+        `Menghapus ${count} tagihan ${jenis_tagihan} untuk ${bulan_tagihan === 'all' ? `Tahun ${tahun}` : bulan_tagihan}`
       );
     }
 
-    return NextResponse.json({ success: true, message: `${idsToDelete.length} tagihan berhasil dihapus`, count: idsToDelete.length });
+    return NextResponse.json({ success: true, message: `${count} tagihan berhasil dihapus`, count });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
