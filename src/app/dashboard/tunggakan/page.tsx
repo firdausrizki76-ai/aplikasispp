@@ -75,6 +75,24 @@ export default function TunggakanPage() {
     }
   };
 
+  const handleDeleteBill = async (billId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus tagihan ini secara permanen?")) return;
+    
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('student_bills').delete().eq('id', billId);
+      
+      if (!error) {
+        setSelectedStudent(null);
+        fetchArrears();
+      } else {
+        alert("Gagal menghapus tagihan: " + error.message);
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    }
+  };
+
   // Filters
   const [filterJenjang, setFilterJenjang] = useState<string>("");
   const [filterKelas, setFilterKelas] = useState<string>("");
@@ -466,6 +484,13 @@ export default function TunggakanPage() {
                             title="Edit/Bebaskan Tagihan"
                           >
                             <span className="material-symbols-outlined text-[16px]">edit</span>
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteBill(bill.id)}
+                            className="text-error hover:text-red-700 hover:bg-error-container p-1.5 rounded-lg transition-colors ml-1"
+                            title="Hapus Tagihan"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
                           </button>
                         </>
                       )}
