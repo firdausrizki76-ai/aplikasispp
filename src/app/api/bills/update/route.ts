@@ -32,6 +32,16 @@ export async function POST(request: Request) {
       if (error) {
         throw new Error(error.message);
       }
+
+      if (userId) {
+        // Fix the audit log trigger's missing user_id due to service_role bypass
+        await supabaseAdmin
+          .from('audit_logs')
+          .update({ user_id: userId })
+          .eq('record_id', billId)
+          .is('user_id', null)
+          .eq('action', 'UPDATE');
+      }
     }
 
     if (userId) {

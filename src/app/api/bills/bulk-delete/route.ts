@@ -40,8 +40,20 @@ export async function POST(request: Request) {
     }
     
     const count = deletedBills.length;
-
+    
     if (userId) {
+      const idsToDelete = deletedBills.map((b: any) => b.id);
+      
+      // Fix trigger audit logs
+      if (idsToDelete.length > 0) {
+        await supabaseAdmin
+          .from('audit_logs')
+          .update({ user_id: userId })
+          .in('record_id', idsToDelete)
+          .is('user_id', null)
+          .eq('action', 'DELETE');
+      }
+
       await insertAuditLog(
         supabaseAdmin, 
         userId, 

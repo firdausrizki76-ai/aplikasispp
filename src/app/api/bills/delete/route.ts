@@ -25,6 +25,14 @@ export async function POST(request: Request) {
     }
 
     if (userId) {
+      // Fix trigger audit log
+      await supabaseAdmin
+        .from('audit_logs')
+        .update({ user_id: userId })
+        .eq('record_id', billId)
+        .is('user_id', null)
+        .eq('action', 'DELETE');
+        
       await insertAuditLog(
         supabaseAdmin, 
         userId, 
