@@ -21,8 +21,19 @@ export default function SiswaPage() {
 
   // Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterJenjang, setFilterJenjang] = useState("");
+  const [filterKelas, setFilterKelas] = useState("");
 
-  const sortedStudents = [...students].sort((a, b) => {
+  const filteredStudents = students.filter(student => {
+    if (filterJenjang && student.grade_level !== filterJenjang) return false;
+    const className = student.classes?.class_name || student.class_name || "";
+    if (filterKelas && className !== filterKelas) return false;
+    if (searchQuery && !student.name.toLowerCase().includes(searchQuery.toLowerCase()) && !student.nis.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
     if (!sortConfig) return 0;
     
     let aValue = a[sortConfig.key] || '';
@@ -291,6 +302,26 @@ export default function SiswaPage() {
     
     setSubmitting(false);
     if (!error) {
+      // Also update existing Belum Lunas bills for this student
+      const { data: unpaidBills } = await supabase.from('student_bills').select('*').eq('student_id', editData.id).eq('status', 'Belum Lunas');
+      if (unpaidBills && unpaidBills.length > 0) {
+         const updates = unpaidBills.map((bill: any) => {
+             const master = masterTagihan.find(mt => mt.nama_tagihan === bill.jenis_tagihan);
+             if (master) {
+                 const defaultNominal = Number(master.nominal_default);
+                 const diskonNominal = diskonObj[bill.jenis_tagihan] || 0;
+                 const newNominal = Math.max(0, defaultNominal - diskonNominal);
+                 if (newNominal !== Number(bill.nominal)) {
+                     return supabase.from('student_bills').update({ nominal: newNominal }).eq('id', bill.id);
+                 }
+             }
+             return null;
+         }).filter(Boolean);
+         if (updates.length > 0) {
+             await Promise.all(updates);
+         }
+      }
+
       setIsEditModalOpen(false);
       fetchStudents();
     } else {
@@ -400,6 +431,38 @@ export default function SiswaPage() {
           </div>
         </div>
         
+        <div className="mb-4 flex flex-wrap gap-4 items-center">
+          <div className="relative flex items-center flex-1 min-w-[200px]">
+            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
+            <input 
+              type="text"
+              placeholder="Cari nama atau NIS siswa..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full border border-outline-variant rounded-lg bg-surface focus:ring-primary focus:border-primary outline-none"
+            />
+          </div>
+          <select 
+            value={filterJenjang}
+            onChange={(e) => setFilterJenjang(e.target.value)}
+            className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+          >
+            <option value="">Semua Jenjang</option>
+            <option value="SD">SD</option>
+            <option value="SMP">SMP</option>
+          </select>
+          <select 
+            value={filterKelas}
+            onChange={(e) => setFilterKelas(e.target.value)}
+            className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+          >
+            <option value="">Semua Kelas</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.class_name}>{c.class_name}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden flex-1">
           <div className="overflow-x-auto h-full">
             <table className="w-full text-left border-collapse text-sm">

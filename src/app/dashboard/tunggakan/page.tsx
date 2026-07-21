@@ -447,7 +447,14 @@ export default function TunggakanPage() {
                         </div>
                       ) : (
                         <>
-                          <p className="font-bold text-error">Rp {Number(bill.nominal).toLocaleString('id-ID')}</p>
+                          <div className="flex flex-col items-end">
+                            {masterBillsMap[bill.jenis_tagihan] && masterBillsMap[bill.jenis_tagihan] > Number(bill.nominal) && (
+                              <span className="line-through text-on-surface-variant text-xs opacity-70 mb-0.5">
+                                Rp {masterBillsMap[bill.jenis_tagihan].toLocaleString('id-ID')}
+                              </span>
+                            )}
+                            <p className="font-bold text-error">Rp {Number(bill.nominal).toLocaleString('id-ID')}</p>
+                          </div>
                           <button 
                             onClick={() => {
                               setEditingBillId(bill.id);

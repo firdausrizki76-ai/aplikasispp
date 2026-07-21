@@ -26,8 +26,16 @@ export default function KelasPage() {
 
   // Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterJenjang, setFilterJenjang] = useState("");
 
-  const sortedClasses = [...classes].sort((a, b) => {
+  const filteredClasses = classes.filter(c => {
+    if (filterJenjang && c.grade_level !== filterJenjang) return false;
+    if (searchQuery && !c.class_name.toLowerCase().includes(searchQuery.toLowerCase()) && !(c.homeroom_teacher || "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const sortedClasses = [...filteredClasses].sort((a, b) => {
     if (!sortConfig) return 0;
     
     let aValue = a[sortConfig.key] || '';
@@ -281,6 +289,28 @@ export default function KelasPage() {
               <span className="material-symbols-outlined text-[18px]">add</span>Tambah Kelas
             </button>
           </div>
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-4 items-center">
+          <div className="relative flex items-center flex-1 min-w-[200px]">
+            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
+            <input 
+              type="text"
+              placeholder="Cari nama kelas atau wali kelas..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full border border-outline-variant rounded-lg bg-surface focus:ring-primary focus:border-primary outline-none"
+            />
+          </div>
+          <select 
+            value={filterJenjang}
+            onChange={(e) => setFilterJenjang(e.target.value)}
+            className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+          >
+            <option value="">Semua Jenjang</option>
+            <option value="SD">SD</option>
+            <option value="SMP">SMP</option>
+          </select>
         </div>
         
         <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden flex-1">
