@@ -80,13 +80,25 @@ export default function TunggakanPage() {
     
     try {
       const supabase = createClient();
-      const { error } = await supabase.from('student_bills').delete().eq('id', billId);
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!error) {
+      const res = await fetch('/api/bills/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          billId,
+          userId: user?.id,
+          actionDetails: `Menghapus tagihan secara permanen`
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
         setSelectedStudent(null);
         fetchArrears();
       } else {
-        alert("Gagal menghapus tagihan: " + error.message);
+        alert("Gagal menghapus tagihan: " + (data.error || "Terjadi kesalahan"));
       }
     } catch (err: any) {
       alert("Terjadi kesalahan: " + err.message);

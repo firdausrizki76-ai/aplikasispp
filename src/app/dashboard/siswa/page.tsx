@@ -312,13 +312,23 @@ export default function SiswaPage() {
                  const diskonNominal = diskonObj[bill.jenis_tagihan] || 0;
                  const newNominal = Math.max(0, defaultNominal - diskonNominal);
                  if (newNominal !== Number(bill.nominal)) {
-                     return supabase.from('student_bills').update({ nominal: newNominal }).eq('id', bill.id);
+                     return { billId: bill.id, nominal: newNominal, status: 'Belum Lunas' };
                  }
              }
              return null;
          }).filter(Boolean);
+         
          if (updates.length > 0) {
-             await Promise.all(updates);
+             const { data: { user } } = await supabase.auth.getUser();
+             await fetch('/api/bills/update', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     updates,
+                     userId: user?.id,
+                     actionDetails: `Update diskon untuk ${updates.length} tagihan`
+                 })
+             });
          }
       }
 
