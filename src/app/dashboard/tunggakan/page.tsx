@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
+import { clearTunggakanCache, setTunggakanCache, tunggakanCache } from "@/utils/tunggakanCache";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Database } from "@/utils/supabase/database.types";
@@ -125,19 +126,13 @@ export default function TunggakanPage() {
 
   const fetchArrears = async (forceRefresh = false) => {
     if (!forceRefresh) {
-      const cached = localStorage.getItem('tunggakan_cache_data_v2');
-      if (cached) {
+      if (tunggakanCache) {
         try {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.masterBillsMap && parsed.arrearsData) {
-            setMasterBillsMap(parsed.masterBillsMap);
-            setArrearsData(parsed.arrearsData);
-            setLoading(false);
-            return;
-          }
-        } catch (e) {
-          // ignore parsing error
-        }
+          setMasterBillsMap(tunggakanCache.masterBillsMap);
+          setArrearsData(tunggakanCache.arrearsData);
+          setLoading(false);
+          return;
+        } catch (e) {}
       }
     }
 
@@ -236,12 +231,10 @@ export default function TunggakanPage() {
     const finalData = Array.from(studentMap.values()).sort((a, b) => b.totalArrears - a.totalArrears);
     setArrearsData(finalData);
     
-    try {
-      localStorage.setItem('tunggakan_cache_data_v2', JSON.stringify({
-        masterBillsMap: map,
-        arrearsData: finalData
-      }));
-    } catch(e) {}
+    setTunggakanCache({
+      masterBillsMap: map,
+      arrearsData: finalData
+    });
     
     setLoading(false);
   };

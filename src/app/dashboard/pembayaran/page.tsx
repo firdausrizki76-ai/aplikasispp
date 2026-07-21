@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
+import { clearTunggakanCache } from "@/utils/tunggakanCache";
 import { useEffect, useState } from "react";
 import { Database } from "@/utils/supabase/database.types";
 import { createPortal } from "react-dom";
@@ -190,7 +191,7 @@ export default function PembayaranPage() {
       setUnpaidBills([]);
       setSelectedBillsToPay({});
       
-      try { localStorage.removeItem('tunggakan_cache_data_v2'); } catch(e) {}
+      try { clearTunggakanCache(); } catch(e) {}
       
       // Refresh Data
       fetchStudentsWithPayments();

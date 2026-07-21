@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
+import { clearTunggakanCache } from "@/utils/tunggakanCache";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -332,7 +333,7 @@ export default function SiswaPage() {
          }
       }
       
-      try { localStorage.removeItem('tunggakan_cache_data_v2'); } catch(e) {}
+      try { clearTunggakanCache(); } catch(e) {}
 
       setIsEditModalOpen(false);
       fetchStudents();
