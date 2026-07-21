@@ -29,8 +29,8 @@ export async function GET(request: Request) {
     while (true) {
       const { data, error } = await supabaseAdmin.from('student_bills')
         .select('*, students(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
-        .gte('created_at', `${startDate}T00:00:00Z`)
-        .lte('created_at', `${endDate}T23:59:59Z`)
+        .gte('tanggal_jatuh_tempo', `${startDate}`)
+        .lte('tanggal_jatuh_tempo', `${endDate}`)
         .range(from, from + step - 1);
         
       if (error) break;
