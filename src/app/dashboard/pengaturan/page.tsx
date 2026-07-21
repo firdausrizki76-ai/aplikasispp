@@ -343,8 +343,9 @@ export default function PengaturanPage() {
           {/* Bulk Generation Section */}
           <div className="lg:col-span-5 flex flex-col gap-gutter">
             {userRole === "pimpinan" ? (
-              <div className="bg-surface-container-lowest rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden">
-                 <div className="p-5 border-b border-outline-variant bg-surface-container-low">
+              <>
+                <div className="bg-surface-container-lowest rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden">
+                   <div className="p-5 border-b border-outline-variant bg-surface-container-low">
                   <h3 className="font-bold text-primary flex items-center gap-2 text-lg">
                     <span className="material-symbols-outlined">auto_fix_high</span>
                     Generate Tagihan Massal
@@ -526,7 +527,7 @@ export default function PengaturanPage() {
                   </form>
                 </div>
               </div>
-            </div>
+              </>
             ) : (
               <div className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant flex flex-col justify-center items-center text-center h-full">
                 <span className="material-symbols-outlined text-4xl text-outline mb-2">lock</span>
