@@ -23,6 +23,7 @@ export default function TunggakanPage() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<ArrearsSummary | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [masterBillsMap, setMasterBillsMap] = useState<Record<string, number>>({});
 
   // Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -142,11 +143,12 @@ export default function TunggakanPage() {
     const error = fetchError;
 
     const { data: masterBills } = await supabase.from("master_tagihan").select("*");
-    const masterBillsMap: Record<string, number> = {};
+    const map: Record<string, number> = {};
     if (masterBills) {
       masterBills.forEach(b => {
-        masterBillsMap[b.nama_tagihan] = Number(b.nominal_default) || 0;
+        map[b.nama_tagihan] = Number(b.nominal_default) || 0;
       });
+      setMasterBillsMap(map);
     }
 
     if (error) {
@@ -179,7 +181,7 @@ export default function TunggakanPage() {
         summary.bills.push(bill);
         
         // Add to original arrears for strike-through if applicable
-        const originalPrice = masterBillsMap[bill.jenis_tagihan] || Number(bill.nominal);
+        const originalPrice = map[bill.jenis_tagihan] || Number(bill.nominal);
         summary.totalOriginalArrears += Number(originalPrice);
       });
     }
