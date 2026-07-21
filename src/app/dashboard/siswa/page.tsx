@@ -332,7 +332,7 @@ export default function SiswaPage() {
          }
       }
       
-      try { localStorage.removeItem('tunggakan_cache_data'); } catch(e) {}
+      try { localStorage.removeItem('tunggakan_cache_data_v2'); } catch(e) {}
 
       setIsEditModalOpen(false);
       fetchStudents();

@@ -190,7 +190,7 @@ export default function PembayaranPage() {
       setUnpaidBills([]);
       setSelectedBillsToPay({});
       
-      try { localStorage.removeItem('tunggakan_cache_data'); } catch(e) {}
+      try { localStorage.removeItem('tunggakan_cache_data_v2'); } catch(e) {}
       
       // Refresh Data
       fetchStudentsWithPayments();

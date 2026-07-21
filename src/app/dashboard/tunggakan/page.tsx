@@ -125,7 +125,7 @@ export default function TunggakanPage() {
 
   const fetchArrears = async (forceRefresh = false) => {
     if (!forceRefresh) {
-      const cached = localStorage.getItem('tunggakan_cache_data');
+      const cached = localStorage.getItem('tunggakan_cache_data_v2');
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
@@ -237,7 +237,7 @@ export default function TunggakanPage() {
     setArrearsData(finalData);
     
     try {
-      localStorage.setItem('tunggakan_cache_data', JSON.stringify({
+      localStorage.setItem('tunggakan_cache_data_v2', JSON.stringify({
         masterBillsMap: map,
         arrearsData: finalData
       }));
