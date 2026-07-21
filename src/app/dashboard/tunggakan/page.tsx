@@ -66,7 +66,7 @@ export default function TunggakanPage() {
       if (res.ok && data.success) {
         setEditingBillId(null);
         setSelectedStudent(null);
-        fetchArrears();
+        fetchArrears(true);
       } else {
         alert("Gagal menyimpan perubahan: " + (data.error || "Terjadi kesalahan"));
       }
@@ -96,7 +96,7 @@ export default function TunggakanPage() {
       
       if (res.ok && data.success) {
         setSelectedStudent(null);
-        fetchArrears();
+        fetchArrears(true);
       } else {
         alert("Gagal menghapus tagihan: " + (data.error || "Terjadi kesalahan"));
       }
@@ -123,7 +123,24 @@ export default function TunggakanPage() {
     }
   };
 
-  const fetchArrears = async () => {
+  const fetchArrears = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = localStorage.getItem('tunggakan_cache_data');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.masterBillsMap && parsed.arrearsData) {
+            setMasterBillsMap(parsed.masterBillsMap);
+            setArrearsData(parsed.arrearsData);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+    }
+
     setLoading(true);
     const supabase = createClient();
     
@@ -216,7 +233,16 @@ export default function TunggakanPage() {
       });
     }
 
-    setArrearsData(Array.from(studentMap.values()).sort((a, b) => b.totalArrears - a.totalArrears));
+    const finalData = Array.from(studentMap.values()).sort((a, b) => b.totalArrears - a.totalArrears);
+    setArrearsData(finalData);
+    
+    try {
+      localStorage.setItem('tunggakan_cache_data', JSON.stringify({
+        masterBillsMap: map,
+        arrearsData: finalData
+      }));
+    } catch(e) {}
+    
     setLoading(false);
   };
 

@@ -331,6 +331,8 @@ export default function SiswaPage() {
              });
          }
       }
+      
+      try { localStorage.removeItem('tunggakan_cache_data'); } catch(e) {}
 
       setIsEditModalOpen(false);
       fetchStudents();

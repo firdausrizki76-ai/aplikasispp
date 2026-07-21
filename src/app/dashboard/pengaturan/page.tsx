@@ -178,6 +178,9 @@ export default function PengaturanPage() {
         if (error) throw error;
         alert(`${insertData.length} tagihan berhasil di-generate!`);
         
+        // Clear tunggakan cache
+        try { localStorage.removeItem('tunggakan_cache_data'); } catch(e) {}
+        
         // Reset bulk form
         setBulkJenis("");
         setBulkNominal("");
