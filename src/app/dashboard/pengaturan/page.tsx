@@ -208,9 +208,12 @@ export default function PengaturanPage() {
     e.preventDefault();
     if (!bulkDeleteJenis || !bulkDeleteMulaiBulan || !bulkDeleteMulaiTahun) return;
     
-    const blnLabel = monthsStr[parseInt(bulkDeleteMulaiBulan)] + ' ' + bulkDeleteMulaiTahun;
+    let blnLabel = bulkDeleteMulaiBulan;
+    if (bulkDeleteMulaiBulan !== 'all') {
+      blnLabel = monthsStr[parseInt(bulkDeleteMulaiBulan)] + ' ' + bulkDeleteMulaiTahun;
+    }
 
-    if (!confirm(`PERINGATAN: Apakah Anda yakin ingin menghapus masal tagihan "${bulkDeleteJenis}" untuk bulan "${blnLabel}"? Hanya tagihan dengan status "Belum Lunas" yang akan terhapus secara permanen.`)) {
+    if (!confirm(`PERINGATAN: Apakah Anda yakin ingin menghapus masal tagihan "${bulkDeleteJenis}" untuk ${bulkDeleteMulaiBulan === 'all' ? `seluruh bulan pada tahun ${bulkDeleteMulaiTahun}` : `bulan ${blnLabel}`}? Hanya tagihan dengan status "Belum Lunas" yang akan terhapus secara permanen.`)) {
       return;
     }
     
@@ -223,6 +226,7 @@ export default function PengaturanPage() {
         body: JSON.stringify({
           jenis_tagihan: bulkDeleteJenis,
           bulan_tagihan: blnLabel,
+          tahun: bulkDeleteMulaiTahun,
           userId: user?.id
         })
       });
@@ -494,6 +498,7 @@ export default function PengaturanPage() {
                           required
                         >
                           <option value="" disabled>Bulan</option>
+                          <option value="all">Semua Bulan (Satu Tahun)</option>
                           {monthsStr.map((m, i) => (
                             <option key={m} value={i}>{m}</option>
                           ))}

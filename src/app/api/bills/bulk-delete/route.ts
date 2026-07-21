@@ -9,19 +9,27 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
   try {
-    const { jenis_tagihan, bulan_tagihan, userId } = await request.json();
+    const { jenis_tagihan, bulan_tagihan, tahun, userId } = await request.json();
     
     if (!jenis_tagihan || !bulan_tagihan) {
       return NextResponse.json({ success: false, error: 'Jenis tagihan dan bulan tagihan harus diisi' }, { status: 400 });
     }
       
     // Only delete 'Belum Lunas' to prevent deleting paid bills
-    const { data: billsToDelete, error: fetchError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('student_bills')
       .select('id')
       .eq('jenis_tagihan', jenis_tagihan)
-      .eq('bulan_tagihan', bulan_tagihan)
       .eq('status', 'Belum Lunas');
+      
+    if (bulan_tagihan === 'all') {
+      if (!tahun) return NextResponse.json({ success: false, error: 'Tahun harus diisi' }, { status: 400 });
+      query = query.ilike('bulan_tagihan', `%${tahun}%`);
+    } else {
+      query = query.eq('bulan_tagihan', bulan_tagihan);
+    }
+      
+    const { data: billsToDelete, error: fetchError } = await query;
       
     if (fetchError) throw new Error(fetchError.message);
     
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
         userId, 
         "Hapus Tagihan Masal", 
         "student_bills", 
-        `Menghapus ${idsToDelete.length} tagihan ${jenis_tagihan} untuk ${bulan_tagihan}`
+        `Menghapus ${idsToDelete.length} tagihan ${jenis_tagihan} untuk ${bulan_tagihan === 'all' ? `Tahun ${tahun}` : bulan_tagihan}`
       );
     }
 
