@@ -100,7 +100,7 @@ export default function SiswaPage() {
 
   const fetchMasterTagihan = async () => {
     const supabase = createClient();
-    const { data } = await supabase.from("master_tagihan").select("nama_tagihan");
+    const { data } = await supabase.from("master_tagihan").select("*");
     setMasterTagihan(data || []);
   };
 
