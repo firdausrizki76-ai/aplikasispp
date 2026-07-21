@@ -26,9 +26,17 @@ export default function PengaturanPage() {
   const [bulkJenis, setBulkJenis] = useState("");
   const [bulkNominal, setBulkNominal] = useState("");
   const [bulkMulaiBulan, setBulkMulaiBulan] = useState("");
-  const [bulkMulaiTahun, setBulkMulaiTahun] = useState("");
+  const [bulkMulaiTahun, setBulkMulaiTahun] = useState(new Date().getFullYear().toString());
   const [bulkDurasi, setBulkDurasi] = useState("1");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  
+  // Bulk delete states
+  const [bulkDeleteJenis, setBulkDeleteJenis] = useState("");
+  const [bulkDeleteMulaiBulan, setBulkDeleteMulaiBulan] = useState("");
+  const [bulkDeleteMulaiTahun, setBulkDeleteMulaiTahun] = useState(new Date().getFullYear().toString());
+  const [bulkDeleteSubmitting, setBulkDeleteSubmitting] = useState(false);
+
+  const monthsStr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
   const supabase = createClient();
 
@@ -193,6 +201,46 @@ export default function PengaturanPage() {
       alert("Gagal generate: " + err.message);
     } finally {
       setBulkSubmitting(false);
+    }
+  };
+
+  const handleBulkDeleteBills = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkDeleteJenis || !bulkDeleteMulaiBulan || !bulkDeleteMulaiTahun) return;
+    
+    const blnLabel = monthsStr[parseInt(bulkDeleteMulaiBulan)] + ' ' + bulkDeleteMulaiTahun;
+
+    if (!confirm(`PERINGATAN: Apakah Anda yakin ingin menghapus masal tagihan "${bulkDeleteJenis}" untuk bulan "${blnLabel}"? Hanya tagihan dengan status "Belum Lunas" yang akan terhapus secara permanen.`)) {
+      return;
+    }
+    
+    setBulkDeleteSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const res = await fetch("/api/bills/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jenis_tagihan: bulkDeleteJenis,
+          bulan_tagihan: blnLabel,
+          userId: user?.id
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Gagal melakukan hapus masal");
+      
+      alert(data.message || `${data.count} tagihan berhasil dihapus masal.`);
+      
+      try { clearTunggakanCache(); } catch(e) {}
+      
+      setBulkDeleteJenis("");
+      setBulkDeleteMulaiBulan("");
+      setBulkDeleteMulaiTahun(new Date().getFullYear().toString());
+    } catch (err: any) {
+      alert("Gagal menghapus masal: " + err.message);
+    } finally {
+      setBulkDeleteSubmitting(false);
     }
   };
 
@@ -410,6 +458,75 @@ export default function PengaturanPage() {
                   </form>
                 </div>
               </div>
+              
+              <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-red-200 mt-6 overflow-hidden">
+                <div className="p-4 bg-red-50 border-b border-red-200">
+                  <h3 className="font-bold text-red-700 flex items-center gap-2 text-lg">
+                    <span className="material-symbols-outlined">delete_sweep</span>
+                    Hapus Tagihan Massal
+                  </h3>
+                  <p className="text-xs text-red-600 mt-1 ml-7">Hapus tagihan yang salah ter-generate. (Hanya tagihan Belum Lunas yang akan terhapus).</p>
+                </div>
+                <div className="p-6">
+                  <form onSubmit={handleBulkDeleteBills} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Jenis Tagihan</label>
+                        <select 
+                          value={bulkDeleteJenis}
+                          onChange={(e) => setBulkDeleteJenis(e.target.value)}
+                          className="w-full px-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-red-400"
+                          required
+                        >
+                          <option value="" disabled>-- Pilih --</option>
+                          {masterTagihan.map(mt => (
+                            <option key={mt.id} value={mt.nama_tagihan}>{mt.nama_tagihan}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Bulan</label>
+                        <select 
+                          value={bulkDeleteMulaiBulan}
+                          onChange={(e) => setBulkDeleteMulaiBulan(e.target.value)}
+                          className="w-full px-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-red-400"
+                          required
+                        >
+                          <option value="" disabled>Bulan</option>
+                          {monthsStr.map((m, i) => (
+                            <option key={m} value={i}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Tahun</label>
+                        <input 
+                          type="number"
+                          value={bulkDeleteMulaiTahun}
+                          onChange={(e) => setBulkDeleteMulaiTahun(e.target.value)}
+                          className="w-full px-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-red-400"
+                          placeholder="2024"
+                          required
+                          min="2020"
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={bulkDeleteSubmitting || masterTagihan.length === 0}
+                      className="w-full mt-4 bg-red-600 text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2 hover:bg-red-700 transition-colors shadow disabled:opacity-50"
+                    >
+                      {bulkDeleteSubmitting ? (
+                        <><span className="material-symbols-outlined animate-spin">refresh</span> Memproses...</>
+                      ) : (
+                        <><span className="material-symbols-outlined">delete_forever</span> Eksekusi Hapus Massal</>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
             ) : (
               <div className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant flex flex-col justify-center items-center text-center h-full">
                 <span className="material-symbols-outlined text-4xl text-outline mb-2">lock</span>
