@@ -33,6 +33,9 @@ export default function SiswaPage() {
       aValue = a.classes?.class_name || '';
       bValue = b.classes?.class_name || '';
     }
+    
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
 
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;

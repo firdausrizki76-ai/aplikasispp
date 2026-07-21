@@ -30,8 +30,11 @@ export default function KelasPage() {
   const sortedClasses = [...classes].sort((a, b) => {
     if (!sortConfig) return 0;
     
-    const aValue = a[sortConfig.key] || '';
-    const bValue = b[sortConfig.key] || '';
+    let aValue = a[sortConfig.key] || '';
+    let bValue = b[sortConfig.key] || '';
+    
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
 
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
