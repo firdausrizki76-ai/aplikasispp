@@ -11,6 +11,7 @@ export default function DashboardPage() {
   const [totalPembayaran, setTotalPembayaran] = useState<number | string>("...");
   const [totalTunggakan, setTotalTunggakan] = useState<number | string>("...");
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [rincianPemasukan, setRincianPemasukan] = useState<Record<string, Record<string, number>> | null>(null);
   const [isSyncing, setIsSyncing] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function DashboardPage() {
           setTotalSiswa(data.totalSiswa);
           setTotalPembayaran(data.totalPembayaran);
           setTotalTunggakan(data.totalTunggakan);
+          setRincianPemasukan(data.rincianPemasukan || null);
           setAuditLogs(data.auditLogs);
         }
       } catch (err) {
@@ -141,7 +143,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
-                Total Pemasukan (SPP)
+                Total Pemasukan Keseluruhan
               </h3>
               <div className="text-2xl lg:text-3xl font-black text-secondary break-words mt-1">
                 Rp {typeof totalPembayaran === 'number' ? totalPembayaran.toLocaleString("id-ID") : totalPembayaran}
@@ -182,6 +184,39 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Rincian Pemasukan per Komponen */}
+      {userRole === "pimpinan" && rincianPemasukan && Object.keys(rincianPemasukan).length > 0 && (
+        <div className="mb-stack-lg animate-page-transition">
+          <h3 className="font-title-lg text-title-lg text-primary mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-secondary">analytics</span>
+            Rincian Pemasukan per Bulan & Komponen
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+            {Object.entries(rincianPemasukan).map(([bulan, komponen]) => (
+              <div key={bulan} className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant">
+                <h4 className="font-title-md text-title-md text-primary mb-4 pb-2 border-b border-outline-variant">
+                  {bulan}
+                </h4>
+                <div className="space-y-3">
+                  {Object.entries(komponen).map(([namaKomponen, nominal]) => (
+                    <div key={namaKomponen} className="flex justify-between items-center">
+                      <span className="font-body-md text-on-surface-variant capitalize">{namaKomponen.toLowerCase()}</span>
+                      <span className="font-label-lg font-bold text-secondary">Rp {(nominal as number).toLocaleString("id-ID")}</span>
+                    </div>
+                  ))}
+                  <div className="pt-3 mt-3 border-t border-dashed border-outline-variant flex justify-between items-center">
+                    <span className="font-label-md font-bold text-on-surface">Total Bulan Ini</span>
+                    <span className="font-title-md font-black text-primary">
+                      Rp {Object.values(komponen).reduce((acc: number, curr: any) => acc + (curr as number), 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
         {/* Form Input Section */}

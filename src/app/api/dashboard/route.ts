@@ -31,18 +31,43 @@ export async function GET() {
         .limit(5)
     ]);
 
-    // Calculate total pembayaran (loop pagination)
+    // Calculate total pembayaran and breakdown (loop pagination)
     let totalPembayaran = 0;
+    const rincianPemasukan: Record<string, Record<string, number>> = {};
     let paymentsFrom = 0;
     const step = 1000;
     while (true) {
       const { data, error } = await supabase
         .from("payment_transactions")
-        .select("amount")
+        .select("amount, payment_date, jenis_tagihan")
         .range(paymentsFrom, paymentsFrom + step - 1);
         
       if (error || !data) break;
-      totalPembayaran += data.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      
+      data.forEach(curr => {
+        const amount = Number(curr.amount) || 0;
+        totalPembayaran += amount;
+
+        if (curr.payment_date && curr.jenis_tagihan) {
+          try {
+            // Parse payment_date to get Month Year, e.g., "Agustus 2026"
+            const dateObj = new Date(curr.payment_date);
+            const monthYear = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(dateObj);
+            const komponen = curr.jenis_tagihan;
+
+            if (!rincianPemasukan[monthYear]) {
+              rincianPemasukan[monthYear] = {};
+            }
+            if (!rincianPemasukan[monthYear][komponen]) {
+              rincianPemasukan[monthYear][komponen] = 0;
+            }
+            rincianPemasukan[monthYear][komponen] += amount;
+          } catch (e) {
+            // Ignore invalid dates
+          }
+        }
+      });
+
       if (data.length < step) break;
       paymentsFrom += step;
     }
@@ -67,6 +92,7 @@ export async function GET() {
       totalSiswa: totalSiswa || 0,
       totalPembayaran,
       totalTunggakan,
+      rincianPemasukan,
       auditLogs: auditLogs || []
     });
 
