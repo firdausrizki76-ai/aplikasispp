@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState("Memuat...");
@@ -83,7 +82,12 @@ export default function DashboardPage() {
     const set = new Set<string>();
     if (rincianPemasukan) Object.values(rincianPemasukan).forEach(k => Object.keys(k).forEach(c => set.add(c)));
     if (rincianTunggakan) Object.values(rincianTunggakan).forEach(k => Object.keys(k).forEach(c => set.add(c)));
-    return ["Semua", ...Array.from(set).sort()];
+    return [
+      "Semua", 
+      "SPP SD (Semua Kelas)", 
+      "SPP SMP (Semua Kelas)", 
+      ...Array.from(set).sort()
+    ];
   }, [rincianPemasukan, rincianTunggakan]);
 
   const displayedPembayaran = useMemo(() => {
@@ -94,8 +98,18 @@ export default function DashboardPage() {
     Object.entries(rincianPemasukan).forEach(([bulan, komponenDict]) => {
       if (filterBulan !== "Semua" && bulan !== filterBulan) return;
       Object.entries(komponenDict).forEach(([komp, amount]) => {
-        if (filterKomponen !== "Semua" && komp !== filterKomponen) return;
-        sum += amount;
+        let isMatch = false;
+        if (filterKomponen === "Semua") {
+          isMatch = true;
+        } else if (filterKomponen === "SPP SD (Semua Kelas)") {
+          isMatch = /^SPP KELAS [1-6]$/i.test(komp);
+        } else if (filterKomponen === "SPP SMP (Semua Kelas)") {
+          isMatch = /^SPP KELAS [7-9]$/i.test(komp);
+        } else {
+          isMatch = komp === filterKomponen;
+        }
+
+        if (isMatch) sum += amount;
       });
     });
     return sum;
@@ -109,33 +123,22 @@ export default function DashboardPage() {
     Object.entries(rincianTunggakan).forEach(([bulan, komponenDict]) => {
       if (filterBulan !== "Semua" && bulan !== filterBulan) return;
       Object.entries(komponenDict).forEach(([komp, amount]) => {
-        if (filterKomponen !== "Semua" && komp !== filterKomponen) return;
-        sum += amount;
+        let isMatch = false;
+        if (filterKomponen === "Semua") {
+          isMatch = true;
+        } else if (filterKomponen === "SPP SD (Semua Kelas)") {
+          isMatch = /^SPP KELAS [1-6]$/i.test(komp);
+        } else if (filterKomponen === "SPP SMP (Semua Kelas)") {
+          isMatch = /^SPP KELAS [7-9]$/i.test(komp);
+        } else {
+          isMatch = komp === filterKomponen;
+        }
+
+        if (isMatch) sum += amount;
       });
     });
     return sum;
   }, [filterBulan, filterKomponen, rincianTunggakan, totalTunggakan]);
-
-  const displayedRincianPemasukan = useMemo(() => {
-    if (!rincianPemasukan) return null;
-    if (filterBulan === "Semua" && filterKomponen === "Semua") return rincianPemasukan;
-    
-    const filtered: Record<string, Record<string, number>> = {};
-    Object.entries(rincianPemasukan).forEach(([bulan, komponenDict]) => {
-      if (filterBulan !== "Semua" && bulan !== filterBulan) return;
-      
-      const filteredKomp: Record<string, number> = {};
-      Object.entries(komponenDict).forEach(([komp, amount]) => {
-        if (filterKomponen !== "Semua" && komp !== filterKomponen) return;
-        filteredKomp[komp] = amount;
-      });
-      
-      if (Object.keys(filteredKomp).length > 0) {
-        filtered[bulan] = filteredKomp;
-      }
-    });
-    return filtered;
-  }, [filterBulan, filterKomponen, rincianPemasukan]);
 
   const today = new Date();
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
@@ -284,70 +287,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-
-      {/* Rincian Pemasukan per Komponen Chart */}
-      {userRole === "pimpinan" && displayedRincianPemasukan && (
-        <div className="mb-stack-lg animate-page-transition">
-          <h3 className="font-title-lg text-title-lg text-primary mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">analytics</span>
-            Grafik Pemasukan {filterBulan !== "Semua" ? filterBulan : 'per Bulan'}
-          </h3>
-          
-          <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant w-full overflow-hidden">
-            {Object.keys(displayedRincianPemasukan).length > 0 ? (
-              <div className="h-[400px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={Object.entries(displayedRincianPemasukan).map(([bulan, komponen]) => ({
-                      name: bulan,
-                      ...komponen
-                    }))}
-                    margin={{
-                      top: 20,
-                      right: 30,
-                      left: 20,
-                      bottom: 5,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-                    <YAxis 
-                      tickFormatter={(value) => `Rp ${(value / 1000000).toFixed(1)}Jt`} 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#64748b' }} 
-                    />
-                    <Tooltip 
-                      formatter={(value: any) => [`Rp ${Number(value).toLocaleString("id-ID")}`, undefined]} 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                      cursor={{fill: '#f1f5f9'}}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    {Array.from(new Set(Object.values(displayedRincianPemasukan).flatMap(komponen => Object.keys(komponen)))).map((key, index) => {
-                      const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
-                      return (
-                        <Bar 
-                          key={key} 
-                          dataKey={key} 
-                          fill={colors[index % colors.length]} 
-                          radius={[4, 4, 0, 0]} 
-                          maxBarSize={50}
-                        />
-                      );
-                    })}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="p-12 flex flex-col items-center justify-center text-center">
-                <span className="material-symbols-outlined text-5xl text-outline mb-4">show_chart</span>
-                <p className="font-title-md text-on-surface-variant font-medium">Belum ada grafik pemasukan</p>
-                <p className="font-body-md text-outline mt-1">Data akan muncul setelah ada transaksi yang berhasil dibayar.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
         {/* Form Input Section */}
