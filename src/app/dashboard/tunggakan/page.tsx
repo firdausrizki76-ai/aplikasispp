@@ -246,7 +246,59 @@ export default function TunggakanPage() {
       phone = '62' + phone.substring(1);
     }
     
-    const text = `Halo Bapak/Ibu wali murid dari ${summary.student.name},\nKami dari pihak sekolah menginformasikan bahwa terdapat tunggakan pembayaran sebanyak ${summary.totalUnpaidBills} tagihan dengan total sebesar Rp ${summary.totalArrears.toLocaleString('id-ID')}. Mohon untuk segera diselesaikan. Terima kasih.`;
+    const className = summary.student.classes?.class_name || summary.student.class_name || "-";
+    const namaSiswa = summary.student.name;
+    const isSD = summary.student.grade_level === "SD";
+    const sekolah = isSD ? "SD Taruna Islam" : summary.student.grade_level === "SMP" ? "SMP Taruna Islam" : "SD Taruna Islam / SMP Taruna Islam";
+
+    const sppBills: string[] = [];
+    const ekskulBills: string[] = [];
+    const ujianBills: string[] = [];
+    const lainnyaBills: string[] = [];
+
+    summary.bills.forEach(bill => {
+      const lowerJenis = bill.jenis_tagihan.toLowerCase();
+      const textLine = `${bill.jenis_tagihan}${bill.bulan_tagihan ? ' ' + bill.bulan_tagihan : ''} (Rp ${Number(bill.nominal).toLocaleString('id-ID')})`;
+      
+      if (lowerJenis.includes("spp")) {
+        sppBills.push(textLine);
+      } else if (lowerJenis.includes("ekskul") || lowerJenis.includes("ekstrakurikuler")) {
+        ekskulBills.push(textLine);
+      } else if (lowerJenis.includes("ujian") || lowerJenis.includes("uts") || lowerJenis.includes("uas")) {
+        ujianBills.push(textLine);
+      } else {
+        lainnyaBills.push(textLine);
+      }
+    });
+
+    const formatCategory = (list: string[]) => {
+      if (list.length === 0) return "-";
+      return "\n  - " + list.join("\n  - ");
+    };
+
+    const text = `🌿 *Assalamu'alaikum warahmatullahi wabarakatuh.*
+
+Yth. *Ayah/Bunda* dari ananda
+👤 *${namaSiswa}*
+🏫 Kelas *${className}*
+
+Semoga Ayah/Bunda beserta keluarga senantiasa diberikan kesehatan, kemudahan, dan keberkahan oleh Allah SWT. Aamiin. 🤲
+
+Mohon izin menghubungi Ayah/Bunda. Berdasarkan data administrasi *${sekolah}*, saat ini terdapat beberapa pembayaran atas nama ananda *${namaSiswa}* yang *belum tercatat* pada administrasi kami, yaitu:
+
+📌 *SPP:* ${formatCategory(sppBills)}
+📌 *Ekstrakurikuler:* ${formatCategory(ekskulBills)}
+📌 *Ujian:* ${formatCategory(ujianBills)}
+📌 *Lainnya:* ${formatCategory(lainnyaBills)}
+
+Mohon bantuan Ayah/Bunda untuk mengonfirmasi apakah pembayaran tersebut memang belum dilakukan atau mungkin sudah dibayarkan namun belum tercatat pada data administrasi kami. 🙏
+
+Apabila pembayaran sudah dilakukan, mohon berkenan mengirimkan bukti pembayarannya agar dapat segera kami lakukan pengecekan dan pembaruan data. 📄✅
+
+Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantiasa melimpahkan keberkahan dan memudahkan segala urusan Ayah/Bunda sekeluarga. 🤲✨
+
+*Wassalamu'alaikum warahmatullahi wabarakatuh.*`;
+
     const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
