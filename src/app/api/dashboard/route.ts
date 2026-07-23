@@ -78,16 +78,33 @@ export async function GET() {
 
     // Calculate total tunggakan (loop pagination)
     let totalTunggakan = 0;
+    const rincianTunggakan: Record<string, Record<string, number>> = {};
     let tunggakanFrom = 0;
     while (true) {
       const { data, error } = await supabase
         .from("student_bills")
-        .select("nominal")
+        .select("nominal, bulan_tagihan, jenis_tagihan")
         .eq("status", "Belum Lunas")
         .range(tunggakanFrom, tunggakanFrom + step - 1);
         
       if (error || !data) break;
-      totalTunggakan += data.reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
+      data.forEach((curr: any) => {
+        const amount = Number(curr.nominal) || 0;
+        totalTunggakan += amount;
+
+        const monthYear = curr.bulan_tagihan;
+        const komponen = curr.jenis_tagihan;
+
+        if (monthYear && komponen) {
+          if (!rincianTunggakan[monthYear]) {
+            rincianTunggakan[monthYear] = {};
+          }
+          if (!rincianTunggakan[monthYear][komponen]) {
+            rincianTunggakan[monthYear][komponen] = 0;
+          }
+          rincianTunggakan[monthYear][komponen] += amount;
+        }
+      });
       if (data.length < step) break;
       tunggakanFrom += step;
     }
@@ -97,6 +114,7 @@ export async function GET() {
       totalPembayaran,
       totalTunggakan,
       rincianPemasukan,
+      rincianTunggakan,
       auditLogs: auditLogs || []
     });
 

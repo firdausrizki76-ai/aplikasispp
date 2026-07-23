@@ -10,16 +10,20 @@ export default function DashboardPage() {
   const [userRole, setUserRole] = useState("admin");
   const [totalSiswa, setTotalSiswa] = useState<number | string>("...");
   const [totalPembayaran, setTotalPembayaran] = useState<number | string>("...");
-  const [totalTunggakan, setTotalTunggakan] = useState<number | string>("...");
+  const [totalTunggakan, setTotalTunggakan] = useState<number | string>("Memuat...");
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [rincianPemasukan, setRincianPemasukan] = useState<Record<string, Record<string, number>> | null>(null);
+  const [rincianTunggakan, setRincianTunggakan] = useState<Record<string, Record<string, number>> | null>(null);
   const [isSyncing, setIsSyncing] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+  const [filterBulan, setFilterBulan] = useState("Semua");
+  const [filterKomponen, setFilterKomponen] = useState("Semua");
 
   useEffect(() => {
+    setIsMounted(true);
     const fetchData = async () => {
       const supabase = createClient();
       
-      // Get user
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
@@ -33,32 +37,30 @@ export default function DashboardPage() {
       try {
         let cachedData = null;
         try {
-          const cached = sessionStorage.getItem('dashboard_cache_v2');
+          const cached = sessionStorage.getItem('dashboard_cache_v3');
           if (cached) cachedData = JSON.parse(cached);
         } catch (e) {}
 
-        // 1. Instantly use cache if available (Stale)
         if (cachedData) {
           setTotalSiswa(cachedData.totalSiswa);
           setTotalPembayaran(cachedData.totalPembayaran);
           setTotalTunggakan(cachedData.totalTunggakan);
           setRincianPemasukan(cachedData.rincianPemasukan || null);
+          setRincianTunggakan(cachedData.rincianTunggakan || null);
           setAuditLogs(cachedData.auditLogs);
-          setIsSyncing(false); // Can show UI immediately
+          setIsSyncing(false);
         }
 
-        // 2. Always fetch fresh data in background (Revalidate)
         const response = await fetch('/api/dashboard');
         if (response.ok) {
           const freshData = await response.json();
-          // Update cache with fresh data
-          try { sessionStorage.setItem('dashboard_cache_v2', JSON.stringify(freshData)); } catch (e) {}
+          try { sessionStorage.setItem('dashboard_cache_v3', JSON.stringify(freshData)); } catch (e) {}
           
-          // Update state with fresh data
           setTotalSiswa(freshData.totalSiswa);
           setTotalPembayaran(freshData.totalPembayaran);
           setTotalTunggakan(freshData.totalTunggakan);
           setRincianPemasukan(freshData.rincianPemasukan || null);
+          setRincianTunggakan(freshData.rincianTunggakan || null);
           setAuditLogs(freshData.auditLogs);
         }
       } catch (err) {
@@ -70,6 +72,71 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
+  const availableBulan = useMemo(() => {
+    const set = new Set<string>();
+    if (rincianPemasukan) Object.keys(rincianPemasukan).forEach(b => set.add(b));
+    if (rincianTunggakan) Object.keys(rincianTunggakan).forEach(b => set.add(b));
+    return ["Semua", ...Array.from(set).sort()];
+  }, [rincianPemasukan, rincianTunggakan]);
+
+  const availableKomponen = useMemo(() => {
+    const set = new Set<string>();
+    if (rincianPemasukan) Object.values(rincianPemasukan).forEach(k => Object.keys(k).forEach(c => set.add(c)));
+    if (rincianTunggakan) Object.values(rincianTunggakan).forEach(k => Object.keys(k).forEach(c => set.add(c)));
+    return ["Semua", ...Array.from(set).sort()];
+  }, [rincianPemasukan, rincianTunggakan]);
+
+  const displayedPembayaran = useMemo(() => {
+    if (!rincianPemasukan) return totalPembayaran;
+    if (filterBulan === "Semua" && filterKomponen === "Semua") return totalPembayaran;
+    
+    let sum = 0;
+    Object.entries(rincianPemasukan).forEach(([bulan, komponenDict]) => {
+      if (filterBulan !== "Semua" && bulan !== filterBulan) return;
+      Object.entries(komponenDict).forEach(([komp, amount]) => {
+        if (filterKomponen !== "Semua" && komp !== filterKomponen) return;
+        sum += amount;
+      });
+    });
+    return sum;
+  }, [filterBulan, filterKomponen, rincianPemasukan, totalPembayaran]);
+
+  const displayedTunggakan = useMemo(() => {
+    if (!rincianTunggakan) return totalTunggakan;
+    if (filterBulan === "Semua" && filterKomponen === "Semua") return totalTunggakan;
+    
+    let sum = 0;
+    Object.entries(rincianTunggakan).forEach(([bulan, komponenDict]) => {
+      if (filterBulan !== "Semua" && bulan !== filterBulan) return;
+      Object.entries(komponenDict).forEach(([komp, amount]) => {
+        if (filterKomponen !== "Semua" && komp !== filterKomponen) return;
+        sum += amount;
+      });
+    });
+    return sum;
+  }, [filterBulan, filterKomponen, rincianTunggakan, totalTunggakan]);
+
+  const displayedRincianPemasukan = useMemo(() => {
+    if (!rincianPemasukan) return null;
+    if (filterBulan === "Semua" && filterKomponen === "Semua") return rincianPemasukan;
+    
+    const filtered: Record<string, Record<string, number>> = {};
+    Object.entries(rincianPemasukan).forEach(([bulan, komponenDict]) => {
+      if (filterBulan !== "Semua" && bulan !== filterBulan) return;
+      
+      const filteredKomp: Record<string, number> = {};
+      Object.entries(komponenDict).forEach(([komp, amount]) => {
+        if (filterKomponen !== "Semua" && komp !== filterKomponen) return;
+        filteredKomp[komp] = amount;
+      });
+      
+      if (Object.keys(filteredKomp).length > 0) {
+        filtered[bulan] = filteredKomp;
+      }
+    });
+    return filtered;
+  }, [filterBulan, filterKomponen, rincianPemasukan]);
+
   const today = new Date();
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
@@ -78,7 +145,7 @@ export default function DashboardPage() {
     year: "numeric",
   }).format(today);
 
-  if (isSyncing) {
+  if (isSyncing || !isMounted) {
     return (
       <div className="view-section h-[80vh] flex flex-col items-center justify-center">
         <div className="animate-pulse flex flex-col items-center gap-4">
@@ -91,7 +158,6 @@ export default function DashboardPage() {
 
   return (
     <div className="view-section animate-page-transition">
-      {/* Welcome Header */}
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="font-headline-lg text-headline-lg text-primary tracking-tight">
@@ -111,9 +177,42 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Summary Cards Bento */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-stack-lg">
-        {/* Total Siswa */}
+      {userRole === "pimpinan" && (
+        <div className="flex flex-col md:flex-row gap-4 animate-page-transition mb-stack-lg">
+          <div className="flex flex-col flex-1">
+            <label className="font-label-sm text-on-surface-variant mb-1 font-bold">Filter Berdasarkan Bulan Tagihan</label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">calendar_month</span>
+              <select 
+                value={filterBulan}
+                onChange={(e) => setFilterBulan(e.target.value)}
+                className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 pl-10"
+              >
+                {availableBulan.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-col flex-1">
+            <label className="font-label-sm text-on-surface-variant mb-1 font-bold">Filter Berdasarkan Komponen</label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">category</span>
+              <select 
+                value={filterKomponen}
+                onChange={(e) => setFilterKomponen(e.target.value)}
+                className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 pl-10"
+              >
+                {availableKomponen.map(k => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-stack-lg animate-page-transition" style={{animationDelay: '100ms'}}>
         <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06)] border-l-4 border-primary">
           <div className="flex justify-between items-start mb-4">
             <span
@@ -139,7 +238,6 @@ export default function DashboardPage() {
 
         {userRole === "pimpinan" ? (
           <>
-            {/* Pembayaran Keseluruhan */}
             <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06)] border-l-4 border-secondary">
               <div className="flex justify-between items-start mb-4">
                 <span
@@ -148,42 +246,34 @@ export default function DashboardPage() {
                 >
                   account_balance_wallet
                 </span>
-                <div className="w-16 h-1 bg-surface-container-highest rounded-full overflow-hidden mt-4">
-                  <div className="bg-secondary h-full w-[100%]"></div>
-                </div>
+                <span className="font-label-sm font-bold text-secondary uppercase tracking-wider">Total Pemasukan {filterKomponen !== "Semua" ? `(${filterKomponen})` : 'Keseluruhan'}</span>
               </div>
-              <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
-                Total Pemasukan Keseluruhan
+              <div className="w-10 h-1 rounded-full bg-secondary"></div>
+              <h3 className="font-title-lg text-title-lg text-on-surface mt-4">
+                Total Pemasukan {filterBulan !== "Semua" ? filterBulan : ''}
               </h3>
               <div className="text-2xl lg:text-3xl font-black text-secondary break-words mt-1">
-                Rp {typeof totalPembayaran === 'number' ? totalPembayaran.toLocaleString("id-ID") : totalPembayaran}
+                Rp {typeof displayedPembayaran === 'number' ? displayedPembayaran.toLocaleString("id-ID") : displayedPembayaran}
               </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">
-                Dari seluruh transaksi tercatat
+                Dari seluruh transaksi tercatat {filterBulan !== "Semua" || filterKomponen !== "Semua" ? 'sesuai filter' : ''}
               </p>
             </div>
 
-            {/* Tunggakan Placeholder */}
-            <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06)] border-l-4 border-error">
-              <div className="flex justify-between items-start mb-4">
-                <span
-                  className="material-symbols-outlined text-error bg-error-container p-3 rounded-lg"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  report
-                </span>
-                <span className="text-error font-bold font-label-md text-label-md">
-                  Aman
-                </span>
+            <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-error">error</span>
+                <span className="font-label-sm font-bold text-error uppercase tracking-wider">Tunggakan Berjalan {filterKomponen !== "Semua" ? `(${filterKomponen})` : ''}</span>
               </div>
-              <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">
-                Tunggakan Berjalan
+              <div className="w-10 h-1 rounded-full bg-error"></div>
+              <h3 className="font-title-lg text-title-lg text-on-surface mt-4">
+                Tunggakan {filterBulan !== "Semua" ? filterBulan : 'Berjalan'}
               </h3>
               <div className="text-2xl lg:text-3xl font-black text-error break-words mt-1">
-                Rp {typeof totalTunggakan === 'number' ? totalTunggakan.toLocaleString("id-ID") : totalTunggakan}
+                Rp {typeof displayedTunggakan === 'number' ? displayedTunggakan.toLocaleString("id-ID") : displayedTunggakan}
               </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2">
-                Dari seluruh tagihan belum lunas
+                Dari seluruh tagihan belum lunas {filterBulan !== "Semua" || filterKomponen !== "Semua" ? 'sesuai filter' : ''}
               </p>
             </div>
           </>
@@ -196,19 +286,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Rincian Pemasukan per Komponen Chart */}
-      {userRole === "pimpinan" && rincianPemasukan && (
+      {userRole === "pimpinan" && displayedRincianPemasukan && (
         <div className="mb-stack-lg animate-page-transition">
           <h3 className="font-title-lg text-title-lg text-primary mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">analytics</span>
-            Grafik Pemasukan per Bulan
+            Grafik Pemasukan {filterBulan !== "Semua" ? filterBulan : 'per Bulan'}
           </h3>
           
           <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant w-full overflow-hidden">
-            {Object.keys(rincianPemasukan).length > 0 ? (
+            {Object.keys(displayedRincianPemasukan).length > 0 ? (
               <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={Object.entries(rincianPemasukan).map(([bulan, komponen]) => ({
+                    data={Object.entries(displayedRincianPemasukan).map(([bulan, komponen]) => ({
                       name: bulan,
                       ...komponen
                     }))}
@@ -233,7 +323,7 @@ export default function DashboardPage() {
                       cursor={{fill: '#f1f5f9'}}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    {Array.from(new Set(Object.values(rincianPemasukan).flatMap(komponen => Object.keys(komponen)))).map((key, index) => {
+                    {Array.from(new Set(Object.values(displayedRincianPemasukan).flatMap(komponen => Object.keys(komponen)))).map((key, index) => {
                       const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
                       return (
                         <Bar 
