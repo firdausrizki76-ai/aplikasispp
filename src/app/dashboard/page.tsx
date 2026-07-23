@@ -31,26 +31,35 @@ export default function DashboardPage() {
       }
 
       try {
-        let data = null;
+        let cachedData = null;
         try {
           const cached = sessionStorage.getItem('dashboard_cache_v2');
-          if (cached) data = JSON.parse(cached);
+          if (cached) cachedData = JSON.parse(cached);
         } catch (e) {}
 
-        if (!data) {
-          const response = await fetch('/api/dashboard');
-          if (response.ok) {
-            data = await response.json();
-            try { sessionStorage.setItem('dashboard_cache_v2', JSON.stringify(data)); } catch (e) {}
-          }
+        // 1. Instantly use cache if available (Stale)
+        if (cachedData) {
+          setTotalSiswa(cachedData.totalSiswa);
+          setTotalPembayaran(cachedData.totalPembayaran);
+          setTotalTunggakan(cachedData.totalTunggakan);
+          setRincianPemasukan(cachedData.rincianPemasukan || null);
+          setAuditLogs(cachedData.auditLogs);
+          setIsSyncing(false); // Can show UI immediately
         }
-        
-        if (data) {
-          setTotalSiswa(data.totalSiswa);
-          setTotalPembayaran(data.totalPembayaran);
-          setTotalTunggakan(data.totalTunggakan);
-          setRincianPemasukan(data.rincianPemasukan || null);
-          setAuditLogs(data.auditLogs);
+
+        // 2. Always fetch fresh data in background (Revalidate)
+        const response = await fetch('/api/dashboard');
+        if (response.ok) {
+          const freshData = await response.json();
+          // Update cache with fresh data
+          try { sessionStorage.setItem('dashboard_cache_v2', JSON.stringify(freshData)); } catch (e) {}
+          
+          // Update state with fresh data
+          setTotalSiswa(freshData.totalSiswa);
+          setTotalPembayaran(freshData.totalPembayaran);
+          setTotalTunggakan(freshData.totalTunggakan);
+          setRincianPemasukan(freshData.rincianPemasukan || null);
+          setAuditLogs(freshData.auditLogs);
         }
       } catch (err) {
         console.error("Failed to fetch dashboard stats via API", err);
