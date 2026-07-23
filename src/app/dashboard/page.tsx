@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState("Memuat...");
@@ -185,43 +186,67 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Rincian Pemasukan per Komponen */}
+      {/* Rincian Pemasukan per Komponen Chart */}
       {userRole === "pimpinan" && rincianPemasukan && (
         <div className="mb-stack-lg animate-page-transition">
           <h3 className="font-title-lg text-title-lg text-primary mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">analytics</span>
-            Rincian Pemasukan per Bulan & Komponen
+            Grafik Pemasukan per Bulan
           </h3>
-          {Object.keys(rincianPemasukan).length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-              {Object.entries(rincianPemasukan).map(([bulan, komponen]) => (
-                <div key={bulan} className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant">
-                  <h4 className="font-title-md text-title-md text-primary mb-4 pb-2 border-b border-outline-variant">
-                    {bulan}
-                  </h4>
-                  <div className="space-y-3">
-                    {Object.entries(komponen).map(([namaKomponen, nominal]) => (
-                      <div key={namaKomponen} className="flex justify-between items-center">
-                        <span className="font-body-md text-on-surface-variant capitalize">{namaKomponen.toLowerCase()}</span>
-                        <span className="font-label-lg font-bold text-secondary">Rp {(nominal as number).toLocaleString("id-ID")}</span>
-                      </div>
-                    ))}
-                    <div className="pt-3 mt-3 border-t border-dashed border-outline-variant flex justify-between items-center">
-                      <span className="font-label-md font-bold text-on-surface">Total Bulan Ini</span>
-                      <span className="font-title-md font-black text-primary">
-                        Rp {Object.values(komponen).reduce((acc: number, curr: any) => acc + (curr as number), 0).toLocaleString("id-ID")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white p-8 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant flex flex-col items-center justify-center text-center">
-              <span className="material-symbols-outlined text-4xl text-outline mb-2">receipt_long</span>
-              <p className="font-body-md text-on-surface-variant font-medium">Belum ada transaksi pembayaran yang tercatat.</p>
-            </div>
-          )}
+          
+          <div className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant w-full overflow-hidden">
+            {Object.keys(rincianPemasukan).length > 0 ? (
+              <div className="h-[400px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={Object.entries(rincianPemasukan).map(([bulan, komponen]) => ({
+                      name: bulan,
+                      ...komponen
+                    }))}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                    <YAxis 
+                      tickFormatter={(value) => `Rp ${(value / 1000000).toFixed(1)}Jt`} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#64748b' }} 
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [`Rp ${value.toLocaleString("id-ID")}`, undefined]} 
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                      cursor={{fill: '#f1f5f9'}}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                    {Array.from(new Set(Object.values(rincianPemasukan).flatMap(komponen => Object.keys(komponen)))).map((key, index) => {
+                      const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
+                      return (
+                        <Bar 
+                          key={key} 
+                          dataKey={key} 
+                          stackId="a" 
+                          fill={colors[index % colors.length]} 
+                          radius={index === 0 ? [0, 0, 4, 4] : [0, 0, 0, 0]} 
+                        />
+                      );
+                    })}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="p-12 flex flex-col items-center justify-center text-center">
+                <span className="material-symbols-outlined text-5xl text-outline mb-4">show_chart</span>
+                <p className="font-title-md text-on-surface-variant font-medium">Belum ada grafik pemasukan</p>
+                <p className="font-body-md text-outline mt-1">Data akan muncul setelah ada transaksi yang berhasil dibayar.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
