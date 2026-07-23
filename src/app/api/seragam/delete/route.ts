@@ -28,9 +28,9 @@ export async function POST(req: Request) {
       await insertAuditLog(
         supabaseAdmin,
         userId,
-        "Hapus Transaksi Seragam",
+        "Hapus Transaksi Seragam/Buku",
         "sales",
-        `Menghapus transaksi seragam sebesar Rp ${sale.total_price}`
+        `Membatalkan/menghapus transaksi ${quantity} x ${item_name}`
       );
       
       // Fix audit log trigger's missing user_id
