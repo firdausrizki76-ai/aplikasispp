@@ -49,6 +49,12 @@ export async function POST(req: Request) {
         "payment_transactions",
         `Membatalkan/menghapus transaksi sebesar Rp ${trx.amount}`
       );
+      
+      // Fix the audit log trigger's missing user_id
+      await supabaseAdmin.from('audit_logs').update({ user_id: userId }).eq('record_id', trx_id).is('user_id', null).eq('action', 'DELETE');
+      if (bill_id) {
+        await supabaseAdmin.from('audit_logs').update({ user_id: userId }).eq('record_id', bill_id).is('user_id', null).eq('action', 'UPDATE');
+      }
     }
 
     return NextResponse.json({ success: true });

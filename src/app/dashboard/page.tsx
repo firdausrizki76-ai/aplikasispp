@@ -75,7 +75,18 @@ export default function DashboardPage() {
     const set = new Set<string>();
     if (rincianPemasukan) Object.keys(rincianPemasukan).forEach(b => set.add(b));
     if (rincianTunggakan) Object.keys(rincianTunggakan).forEach(b => set.add(b));
-    return ["Semua", ...Array.from(set).sort()];
+    
+    const monthOrder: Record<string, number> = {
+      "Januari": 1, "Februari": 2, "Maret": 3, "April": 4, "Mei": 5, "Juni": 6, 
+      "Juli": 7, "Agustus": 8, "September": 9, "Oktober": 10, "November": 11, "Desember": 12
+    };
+
+    return ["Semua", ...Array.from(set).sort((a, b) => {
+      const [mA, yA] = a.split(" ");
+      const [mB, yB] = b.split(" ");
+      if (yA !== yB) return Number(yA) - Number(yB);
+      return (monthOrder[mA] || 0) - (monthOrder[mB] || 0);
+    })];
   }, [rincianPemasukan, rincianTunggakan]);
 
   const availableKomponen = useMemo(() => {

@@ -61,6 +61,10 @@ export async function POST(request: Request) {
       target,
       `Menghapus data ${target} dengan filter ${filterType} = ${filterValue || 'Semua'}`
     );
+    
+    // Fix audit log trigger's missing user_id for bulk deletes
+    // We update all recent null user_ids for this table and action
+    await supabaseAdmin.from('audit_logs').update({ user_id: user.id }).is('user_id', null).eq('table_name', target).eq('action', 'DELETE');
 
     return NextResponse.json({ success: true, message: `Data ${target} berhasil dihapus secara masal.` });
 

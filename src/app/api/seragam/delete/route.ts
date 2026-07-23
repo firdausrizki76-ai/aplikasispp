@@ -28,10 +28,13 @@ export async function POST(req: Request) {
       await insertAuditLog(
         supabaseAdmin,
         userId,
-        "Hapus Transaksi Seragam/Buku",
+        "Hapus Transaksi Seragam",
         "sales",
-        `Membatalkan/menghapus transaksi ${quantity} x ${item_name}`
+        `Menghapus transaksi seragam sebesar Rp ${sale.total_price}`
       );
+      
+      // Fix audit log trigger's missing user_id
+      await supabaseAdmin.from('audit_logs').update({ user_id: userId }).eq('record_id', sale_id).is('user_id', null).eq('action', 'DELETE');
     }
 
     return NextResponse.json({ success: true });
