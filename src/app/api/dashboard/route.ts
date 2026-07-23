@@ -39,32 +39,36 @@ export async function GET() {
     while (true) {
       const { data, error } = await supabase
         .from("payment_transactions")
-        .select("amount, payment_date, jenis_tagihan")
+        .select("amount, jenis_tagihan, student_bills(bulan_tagihan, jenis_tagihan)")
         .range(paymentsFrom, paymentsFrom + step - 1);
         
       if (error || !data) break;
       
-      data.forEach(curr => {
+      data.forEach((curr: any) => {
         const amount = Number(curr.amount) || 0;
         totalPembayaran += amount;
 
-        if (curr.payment_date && curr.jenis_tagihan) {
-          try {
-            // Parse payment_date to get Month Year, e.g., "Agustus 2026"
-            const dateObj = new Date(curr.payment_date);
-            const monthYear = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(dateObj);
-            const komponen = curr.jenis_tagihan;
+        // Use billed month and component if available from relation, fallback to parsing string
+        let monthYear = '';
+        let komponen = '';
 
-            if (!rincianPemasukan[monthYear]) {
-              rincianPemasukan[monthYear] = {};
-            }
-            if (!rincianPemasukan[monthYear][komponen]) {
-              rincianPemasukan[monthYear][komponen] = 0;
-            }
-            rincianPemasukan[monthYear][komponen] += amount;
-          } catch (e) {
-            // Ignore invalid dates
+        if (curr.student_bills) {
+          monthYear = curr.student_bills.bulan_tagihan;
+          komponen = curr.student_bills.jenis_tagihan;
+        } else if (curr.jenis_tagihan) {
+          // Fallback if relation is null for some reason
+          komponen = curr.jenis_tagihan;
+          monthYear = 'Lainnya'; 
+        }
+
+        if (monthYear && komponen) {
+          if (!rincianPemasukan[monthYear]) {
+            rincianPemasukan[monthYear] = {};
           }
+          if (!rincianPemasukan[monthYear][komponen]) {
+            rincianPemasukan[monthYear][komponen] = 0;
+          }
+          rincianPemasukan[monthYear][komponen] += amount;
         }
       });
 
