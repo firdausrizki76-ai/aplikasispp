@@ -33,7 +33,7 @@ export default function DashboardPage() {
       try {
         let data = null;
         try {
-          const cached = sessionStorage.getItem('dashboard_cache');
+          const cached = sessionStorage.getItem('dashboard_cache_v2');
           if (cached) data = JSON.parse(cached);
         } catch (e) {}
 
@@ -41,7 +41,7 @@ export default function DashboardPage() {
           const response = await fetch('/api/dashboard');
           if (response.ok) {
             data = await response.json();
-            try { sessionStorage.setItem('dashboard_cache', JSON.stringify(data)); } catch (e) {}
+            try { sessionStorage.setItem('dashboard_cache_v2', JSON.stringify(data)); } catch (e) {}
           }
         }
         
