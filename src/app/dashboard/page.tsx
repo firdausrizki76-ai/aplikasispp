@@ -241,6 +241,7 @@ export default function DashboardPage() {
                           dataKey={key} 
                           fill={colors[index % colors.length]} 
                           radius={[4, 4, 0, 0]} 
+                          maxBarSize={50}
                         />
                       );
                     })}
