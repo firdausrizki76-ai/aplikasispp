@@ -239,9 +239,8 @@ export default function DashboardPage() {
                         <Bar 
                           key={key} 
                           dataKey={key} 
-                          stackId="a" 
                           fill={colors[index % colors.length]} 
-                          radius={index === 0 ? [0, 0, 4, 4] : [0, 0, 0, 0]} 
+                          radius={[4, 4, 0, 0]} 
                         />
                       );
                     })}
