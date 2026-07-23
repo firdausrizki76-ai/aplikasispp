@@ -186,35 +186,42 @@ export default function DashboardPage() {
       </div>
 
       {/* Rincian Pemasukan per Komponen */}
-      {userRole === "pimpinan" && rincianPemasukan && Object.keys(rincianPemasukan).length > 0 && (
+      {userRole === "pimpinan" && rincianPemasukan && (
         <div className="mb-stack-lg animate-page-transition">
           <h3 className="font-title-lg text-title-lg text-primary mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">analytics</span>
             Rincian Pemasukan per Bulan & Komponen
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-            {Object.entries(rincianPemasukan).map(([bulan, komponen]) => (
-              <div key={bulan} className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant">
-                <h4 className="font-title-md text-title-md text-primary mb-4 pb-2 border-b border-outline-variant">
-                  {bulan}
-                </h4>
-                <div className="space-y-3">
-                  {Object.entries(komponen).map(([namaKomponen, nominal]) => (
-                    <div key={namaKomponen} className="flex justify-between items-center">
-                      <span className="font-body-md text-on-surface-variant capitalize">{namaKomponen.toLowerCase()}</span>
-                      <span className="font-label-lg font-bold text-secondary">Rp {(nominal as number).toLocaleString("id-ID")}</span>
+          {Object.keys(rincianPemasukan).length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+              {Object.entries(rincianPemasukan).map(([bulan, komponen]) => (
+                <div key={bulan} className="bg-white p-6 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant">
+                  <h4 className="font-title-md text-title-md text-primary mb-4 pb-2 border-b border-outline-variant">
+                    {bulan}
+                  </h4>
+                  <div className="space-y-3">
+                    {Object.entries(komponen).map(([namaKomponen, nominal]) => (
+                      <div key={namaKomponen} className="flex justify-between items-center">
+                        <span className="font-body-md text-on-surface-variant capitalize">{namaKomponen.toLowerCase()}</span>
+                        <span className="font-label-lg font-bold text-secondary">Rp {(nominal as number).toLocaleString("id-ID")}</span>
+                      </div>
+                    ))}
+                    <div className="pt-3 mt-3 border-t border-dashed border-outline-variant flex justify-between items-center">
+                      <span className="font-label-md font-bold text-on-surface">Total Bulan Ini</span>
+                      <span className="font-title-md font-black text-primary">
+                        Rp {Object.values(komponen).reduce((acc: number, curr: any) => acc + (curr as number), 0).toLocaleString("id-ID")}
+                      </span>
                     </div>
-                  ))}
-                  <div className="pt-3 mt-3 border-t border-dashed border-outline-variant flex justify-between items-center">
-                    <span className="font-label-md font-bold text-on-surface">Total Bulan Ini</span>
-                    <span className="font-title-md font-black text-primary">
-                      Rp {Object.values(komponen).reduce((acc: number, curr: any) => acc + (curr as number), 0).toLocaleString("id-ID")}
-                    </span>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white p-8 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant flex flex-col items-center justify-center text-center">
+              <span className="material-symbols-outlined text-4xl text-outline mb-2">receipt_long</span>
+              <p className="font-body-md text-on-surface-variant font-medium">Belum ada transaksi pembayaran yang tercatat.</p>
+            </div>
+          )}
         </div>
       )}
 
