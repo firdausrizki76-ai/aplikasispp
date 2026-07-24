@@ -12,6 +12,19 @@ type StudentBill = Database["public"]["Tables"]["student_bills"]["Row"];
 type MasterTagihan = Database["public"]["Tables"]["master_tagihan"]["Row"];
 
 export default function PembayaranPage() {
+  const supabase = createClient();
+  const [userRole, setUserRole] = useState("admin");
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        setUserRole(profile?.role || "admin");
+      }
+    };
+    checkRole();
+  }, []);
+
   const [studentsData, setStudentsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

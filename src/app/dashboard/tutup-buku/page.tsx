@@ -1,10 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import * as XLSX from "xlsx";
 
 export default function TutupBukuPage() {
+  const supabase = createClient();
+  const [userRole, setUserRole] = useState("admin");
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        setUserRole(profile?.role || "admin");
+      }
+    };
+    checkRole();
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
 
@@ -140,7 +153,8 @@ export default function TutupBukuPage() {
               <p className="text-on-surface-variant mb-6 max-w-4xl">
                 Tindakan ini akan mengosongkan seluruh riwayat pembayaran dan menaikkan kelas siswa. <strong className="text-error">Siswa yang belum lunas tunggakannya akan tetap dinaikan kelas, tapi tagihannya dari tahun ajaran sebelumnya tidak akan ter-reset/hilang (status menunggak).</strong> Pastikan Anda telah <strong>mengunduh semua arsip di atas</strong> sebelum melakukan proses ini.
               </p>
-              <button 
+              {userRole === 'pimpinan' && (
+<button 
                 onClick={handleTutupBuku}
                 disabled={processing || loading}
                 className="bg-error hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 transition-colors shadow disabled:opacity-50"
@@ -150,6 +164,7 @@ export default function TutupBukuPage() {
                 </span>
                 {processing ? 'Memproses Tutup Buku...' : 'Proses Tutup Buku & Reset'}
               </button>
+)}
             </div>
           </div>
         </div>

@@ -6,6 +6,19 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 
 export default function KelasPage() {
+  const supabase = createClient();
+  const [userRole, setUserRole] = useState("admin");
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        setUserRole(profile?.role || "admin");
+      }
+    };
+    checkRole();
+  }, []);
+
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -275,13 +288,15 @@ export default function KelasPage() {
               Import Excel
               <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
             </label>
-            <button 
+            {userRole === 'pimpinan' && (
+<button 
               onClick={() => setIsBulkDeleteModalOpen(true)}
               className="bg-error hover:bg-red-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow text-sm"
             >
               <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
               Hapus Masal
             </button>
+)}
             <button 
               onClick={() => setIsAddModalOpen(true)}
               className="bg-primary hover:bg-primary-container text-on-primary px-6 py-3 rounded-lg flex items-center gap-2 font-bold transition-all shadow text-sm"

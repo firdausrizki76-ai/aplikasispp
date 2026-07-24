@@ -19,6 +19,19 @@ interface ArrearsSummary {
 }
 
 export default function TunggakanPage() {
+  const supabase = createClient();
+  const [userRole, setUserRole] = useState("admin");
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        setUserRole(profile?.role || "admin");
+      }
+    };
+    checkRole();
+  }, []);
+
   const [arrearsData, setArrearsData] = useState<ArrearsSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -568,13 +581,15 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
                           >
                             <span className="material-symbols-outlined text-[16px]">edit</span>
                           </button>
-                          <button 
+                          {userRole === 'pimpinan' && (
+<button 
                             onClick={() => handleDeleteBill(bill.id)}
                             className="text-error hover:text-red-700 hover:bg-error-container p-1.5 rounded-lg transition-colors ml-1"
                             title="Hapus Tagihan"
                           >
                             <span className="material-symbols-outlined text-[16px]">delete</span>
                           </button>
+)}
                         </>
                       )}
                     </div>
