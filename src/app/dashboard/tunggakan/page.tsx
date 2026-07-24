@@ -299,7 +299,7 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
 
 *Wassalamu'alaikum warahmatullahi wabarakatuh.*`;
 
-    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    const waUrl = `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
 
