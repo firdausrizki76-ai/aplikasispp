@@ -269,7 +269,27 @@ export default function TunggakanPage() {
     const ujianBills: string[] = [];
     const lainnyaBills: string[] = [];
 
-    summary.bills.forEach(bill => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+
+    const filteredBills = summary.bills.filter(bill => {
+      if (!bill.tanggal_jatuh_tempo) return true;
+      const dueDate = new Date(bill.tanggal_jatuh_tempo);
+      if (isNaN(dueDate.getTime())) return true;
+      
+      const dueYear = dueDate.getFullYear();
+      const dueMonth = dueDate.getMonth();
+      
+      return dueYear < currentYear || (dueYear === currentYear && dueMonth <= currentMonth);
+    });
+
+    if (filteredBills.length === 0) {
+      alert("Tidak ada tagihan yang tertunggak sampai dengan bulan ini.");
+      return;
+    }
+
+    filteredBills.forEach(bill => {
       const lowerJenis = bill.jenis_tagihan.toLowerCase();
       const textLine = `${bill.jenis_tagihan}${bill.bulan_tagihan ? ' ' + bill.bulan_tagihan : ''} (Rp ${Number(bill.nominal).toLocaleString('id-ID')})`;
       
