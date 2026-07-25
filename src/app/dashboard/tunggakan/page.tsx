@@ -166,6 +166,7 @@ export default function TunggakanPage() {
           nominal,
           jenis_tagihan,
           bulan_tagihan,
+          tanggal_jatuh_tempo,
           student_id,
           students (
             id,
