@@ -5,6 +5,181 @@ import { clearTunggakanCache } from "@/utils/tunggakanCache";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+const normalizePhone = (phone: string | number | null | undefined): string | null => {
+  if (phone === null || phone === undefined) return null;
+  let phoneStr = String(phone).trim();
+  if (!phoneStr) return null;
+  // Remove spaces, hyphens, dots, parentheses, slashes
+  phoneStr = phoneStr.replace(/[\s\-\.\(\)\/]/g, '');
+  if (!phoneStr) return null;
+
+  // Normalize Indonesian phone numbers:
+  // If number stripped leading 0 (e.g. 81234567890), prepend '0'
+  if (/^8\d{7,14}$/.test(phoneStr)) {
+    phoneStr = '0' + phoneStr;
+  } else if (phoneStr.startsWith('+62')) {
+    phoneStr = '0' + phoneStr.substring(3);
+  } else if (phoneStr.startsWith('62') && phoneStr.length > 10) {
+    phoneStr = '0' + phoneStr.substring(2);
+  }
+  return phoneStr || null;
+};
+
+const extractValue = (row: Record<string, any>, possibleHeaders: string[]): string => {
+  if (!row || typeof row !== 'object') return '';
+  // 1. Exact match
+  for (const key of possibleHeaders) {
+    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+      return String(row[key]).trim();
+    }
+  }
+  // 2. Case-insensitive & trimmed match
+  const rowKeys = Object.keys(row);
+  for (const key of rowKeys) {
+    const lowerKey = key.trim().toLowerCase();
+    if (possibleHeaders.some(h => h.toLowerCase() === lowerKey)) {
+      const val = row[key];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        return String(val).trim();
+      }
+    }
+  }
+  return '';
+};
+
+const extractParentPhone = (row: Record<string, any>): string | null => {
+  if (!row || typeof row !== 'object') return null;
+
+  const knownHeaders = [
+    'No WA Orang Tua',
+    'No WA Ortu',
+    'No. WA Orang Tua',
+    'No. WA Ortu',
+    'No WA',
+    'No. WA',
+    'Nomor WA Orang Tua',
+    'Nomor WA Ortu',
+    'Nomor WA',
+    'Nomor Ortu WA',
+    'No Ortu WA',
+    'No. Ortu WA',
+    'WA Orang Tua',
+    'WA Ortu',
+    'WA',
+    'No HP Orang Tua',
+    'No HP Ortu',
+    'No. HP Orang Tua',
+    'No. HP Ortu',
+    'No HP',
+    'No. HP',
+    'Nomor HP Orang Tua',
+    'Nomor HP Ortu',
+    'Nomor HP',
+    'No Telp Orang Tua',
+    'No Telp Ortu',
+    'No. Telp Orang Tua',
+    'No. Telp Ortu',
+    'No Telp',
+    'No. Telp',
+    'No Telepon Orang Tua',
+    'No Telepon Ortu',
+    'No. Telepon Orang Tua',
+    'No. Telepon Ortu',
+    'No Telepon',
+    'No. Telepon',
+    'Nomor Telepon',
+    'WhatsApp',
+    'No WhatsApp',
+    'No. WhatsApp',
+    'Nomor WhatsApp',
+    'WhatsApp Orang Tua',
+    'WhatsApp Ortu',
+    'HP / WA',
+    'HP/WA',
+    'No HP / WA',
+    'No. HP / WA',
+    'No HP/WA',
+    'No. HP/WA',
+    'WA / HP',
+    'WA/HP',
+    'No WA / HP',
+    'No. WA / HP',
+    'No WA/HP',
+    'No. WA/HP',
+    'parent_phone',
+    'Parent Phone',
+    'phone',
+    'Phone',
+    'Telp',
+    'Telepon',
+    'HP',
+    'Kontak',
+    'No Kontak',
+    'No. Kontak',
+    'Kontak Ortu',
+    'Kontak Orang Tua',
+    'No. WA Ortu/HP',
+    'No WA Ortu/HP',
+    'No WA Orangtua',
+    'No. WA Orangtua',
+    'Nomor WA Orangtua'
+  ];
+
+  let rawValue: any = null;
+
+  // 1. Exact match
+  for (const key of knownHeaders) {
+    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+      rawValue = row[key];
+      break;
+    }
+  }
+
+  // 2. Case-insensitive & trimmed header match
+  if (rawValue === null || rawValue === undefined) {
+    const rowKeys = Object.keys(row);
+    for (const key of rowKeys) {
+      const trimmedKey = key.trim();
+      const lowerKey = trimmedKey.toLowerCase();
+      if (knownHeaders.some(h => h.toLowerCase() === lowerKey)) {
+        const val = row[key];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          rawValue = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Keyword match (wa, ortu, hp, telp, phone, whatsapp, kontak)
+  if (rawValue === null || rawValue === undefined) {
+    const rowKeys = Object.keys(row);
+    for (const key of rowKeys) {
+      const lower = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (
+        lower.includes('wa') ||
+        lower.includes('ortu') ||
+        lower.includes('orangtua') ||
+        lower.includes('hp') ||
+        lower.includes('telp') ||
+        lower.includes('phone') ||
+        lower.includes('whatsapp') ||
+        lower.includes('kontak')
+      ) {
+        if (!['siswa', 'namasiswa', 'kelas', 'jenjang', 'nis', 'namalengkap', 'nama', 'diskon', 'status', 'id', 'no', 'nomor'].includes(lower)) {
+          const val = row[key];
+          if (val !== undefined && val !== null && String(val).trim() !== '') {
+            rawValue = val;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return normalizePhone(rawValue);
+};
+
 export default function SiswaPage() {
   const supabase = createClient();
   const [userRole, setUserRole] = useState("admin");
@@ -185,23 +360,30 @@ export default function SiswaPage() {
         const { data: classList } = await supabase.from('classes').select('*');
         const classMap = new Map();
         classList?.forEach(c => {
-          classMap.set(`${c.class_name}_${c.grade_level}`.toLowerCase(), c.id);
+          const cName = String(c.class_name || '').trim().toLowerCase();
+          const cGrade = String(c.grade_level || '').trim().toLowerCase();
+          classMap.set(`${cName}_${cGrade}`, c.id);
         });
 
         const studentsToInsert = data.map((row: any) => {
-          const jenjang = row['Jenjang'] || 'SD';
-          const className = row['Kelas'] || '';
-          const classKey = `${className}_${jenjang}`.toLowerCase();
-          const classId = classMap.get(classKey);
+          const jenjangRaw = extractValue(row, ['Jenjang', 'Tingkat', 'Grade']) || 'SD';
+          const jenjang = jenjangRaw.trim().toUpperCase() === 'SMP' ? 'SMP' : 'SD';
+          const classNameRaw = extractValue(row, ['Kelas', 'Nama Kelas', 'Rombel', 'Class']);
+          const className = classNameRaw.trim();
+          const classKey = `${className.toLowerCase()}_${jenjang.toLowerCase()}`;
+          const classId = classMap.get(classKey) || null;
 
-          const studentName = row['Nama'] || row['Nama Lengkap'] || row['Nama Siswa'];
+          const studentName = extractValue(row, ['Nama', 'Nama Lengkap', 'Nama Siswa', 'Nama Siswa/i', 'Siswa', 'Name']);
+          const nisVal = extractValue(row, ['NIS', 'NISN', 'No Induk', 'Nomor Induk', 'Nomor Induk Siswa', 'No. Induk', 'Nomor NIS']);
+          const parentPhone = extractParentPhone(row);
 
           return {
-            nis: row['NIS']?.toString() || null,
+            nis: nisVal || null,
             name: studentName,
             grade_level: jenjang,
-            class_id: classId || null,
-            parent_phone: row['No WA Orang Tua']?.toString() || row['No WA']?.toString() || null,
+            class_id: classId,
+            class_name: className || null,
+            parent_phone: parentPhone,
             status: 'aktif'
           };
         }).filter(s => s.name);
@@ -250,7 +432,7 @@ export default function SiswaPage() {
         name: formData.nama, 
         grade_level: formData.jenjang,
         class_id: formData.kelas_id,
-        parent_phone: formData.parent_phone,
+        parent_phone: normalizePhone(formData.parent_phone),
         status: 'aktif',
         diskon: diskonObj
       }
@@ -309,7 +491,7 @@ export default function SiswaPage() {
       name: editData.nama,
       grade_level: editData.jenjang,
       class_id: editData.kelas_id,
-      parent_phone: editData.parent_phone,
+      parent_phone: normalizePhone(editData.parent_phone),
       status: editData.status,
       diskon: diskonObj
     }).eq('id', editData.id);
