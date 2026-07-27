@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { clearTunggakanCache, setTunggakanCache, tunggakanCache } from "@/utils/tunggakanCache";
+import { formatWhatsAppNumber } from "@/utils/phone";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Database } from "@/utils/supabase/database.types";
@@ -254,10 +255,10 @@ export default function TunggakanPage() {
   };
 
   const handleSendWA = (summary: ArrearsSummary) => {
-    let phone = summary.student.parent_phone || '';
-    // Format to 62... if starts with 0
-    if (phone.startsWith('0')) {
-      phone = '62' + phone.substring(1);
+    const phone = formatWhatsAppNumber(summary.student.parent_phone);
+    if (!phone) {
+      alert("Nomor WhatsApp orang tua tidak tersedia atau format tidak valid.");
+      return;
     }
     
     const className = summary.student.classes?.class_name || summary.student.class_name || "-";
@@ -333,7 +334,7 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
 
 *Wassalamu'alaikum warahmatullahi wabarakatuh.*`;
 
-    const waUrl = `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(text)}`;
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
 

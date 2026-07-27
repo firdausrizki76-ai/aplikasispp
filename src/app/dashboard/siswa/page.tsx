@@ -4,26 +4,7 @@ import { createClient } from "@/utils/supabase/client";
 import { clearTunggakanCache } from "@/utils/tunggakanCache";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-
-const normalizePhone = (phone: string | number | null | undefined): string | null => {
-  if (phone === null || phone === undefined) return null;
-  let phoneStr = String(phone).trim();
-  if (!phoneStr) return null;
-  // Remove spaces, hyphens, dots, parentheses, slashes
-  phoneStr = phoneStr.replace(/[\s\-\.\(\)\/]/g, '');
-  if (!phoneStr) return null;
-
-  // Normalize Indonesian phone numbers:
-  // If number stripped leading 0 (e.g. 81234567890), prepend '0'
-  if (/^8\d{7,14}$/.test(phoneStr)) {
-    phoneStr = '0' + phoneStr;
-  } else if (phoneStr.startsWith('+62')) {
-    phoneStr = '0' + phoneStr.substring(3);
-  } else if (phoneStr.startsWith('62') && phoneStr.length > 10) {
-    phoneStr = '0' + phoneStr.substring(2);
-  }
-  return phoneStr || null;
-};
+import { normalizePhone, formatWhatsAppNumber } from "@/utils/phone";
 
 const extractValue = (row: Record<string, any>, possibleHeaders: string[]): string => {
   if (!row || typeof row !== 'object') return '';
@@ -712,7 +693,22 @@ export default function SiswaPage() {
                       <tr key={siswa.id} className="hover:bg-surface-container-low/30">
                         <td className="px-6 py-4 text-on-surface-variant font-data-mono">{siswa.nis || "-"}</td>
                         <td className="px-6 py-4 font-medium text-primary">{siswa.name}</td>
-                        <td className="px-6 py-4 font-data-mono">{siswa.parent_phone || '-'}</td>
+                        <td className="px-6 py-4 font-data-mono">
+                          {siswa.parent_phone ? (
+                            <a
+                              href={`https://wa.me/${formatWhatsAppNumber(siswa.parent_phone)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-600 hover:text-green-700 hover:underline inline-flex items-center gap-1 font-medium"
+                              title="Chat WhatsApp Orang Tua"
+                            >
+                              <span>{siswa.parent_phone}</span>
+                              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                         <td className="px-6 py-4 font-medium">{siswa.grade_level}</td>
                         <td className="px-6 py-4 font-medium">{siswa.classes?.class_name || '-'}</td>
                         <td className="px-6 py-4 text-sm font-medium">
