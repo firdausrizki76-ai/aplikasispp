@@ -43,6 +43,16 @@ export default function TunggakanPage() {
   // Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
+  // Tabs & Monthly Notification State
+  const [activeTab, setActiveTab] = useState<'semua' | 'bulanan'>('semua');
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+
+  useEffect(() => {
+    const monthsStr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const now = new Date();
+    setSelectedMonth(`${monthsStr[now.getMonth()]} ${now.getFullYear()}`);
+  }, []);
+
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -334,7 +344,7 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
 
 *Wassalamu'alaikum warahmatullahi wabarakatuh.*`;
 
-    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    const waUrl = `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
 
@@ -394,140 +404,448 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
       : <span className="material-symbols-outlined text-[16px] text-primary">arrow_downward</span>;
   };
 
+  const getAvailableMonths = () => {
+    const monthsSet = new Set<string>();
+    const monthsStr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    
+    const now = new Date();
+    const currentLabel = `${monthsStr[now.getMonth()]} ${now.getFullYear()}`;
+    monthsSet.add(currentLabel);
+
+    arrearsData.forEach(s => {
+      s.bills?.forEach(b => {
+        if ((b.jenis_tagihan || "").toLowerCase().includes("spp") && b.bulan_tagihan) {
+          monthsSet.add(b.bulan_tagihan.trim());
+        }
+      });
+    });
+
+    return Array.from(monthsSet);
+  };
+
+  const isBillForSelectedMonth = (bill: any, targetMonthLabel: string) => {
+    if (!bill || !targetMonthLabel) return false;
+    const jenis = (bill.jenis_tagihan || "").toLowerCase();
+    const isSpp = jenis.includes("spp");
+    if (!isSpp) return false;
+
+    const bulanTagihan = (bill.bulan_tagihan || "").trim().toLowerCase();
+    const selectedLower = targetMonthLabel.trim().toLowerCase();
+
+    if (bulanTagihan === selectedLower) return true;
+    if (bulanTagihan && selectedLower && (bulanTagihan.includes(selectedLower) || selectedLower.includes(bulanTagihan))) {
+      return true;
+    }
+
+    if (bill.tanggal_jatuh_tempo) {
+      const dueDate = new Date(bill.tanggal_jatuh_tempo);
+      if (!isNaN(dueDate.getTime())) {
+        const monthsStr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const dueMonthLabel = `${monthsStr[dueDate.getMonth()]} ${dueDate.getFullYear()}`.toLowerCase();
+        if (dueMonthLabel === selectedLower) return true;
+      }
+    }
+
+    return false;
+  };
+
+  const monthlyArrearsData = arrearsData
+    .map(summary => {
+      const sppMonthBills = summary.bills.filter(b => isBillForSelectedMonth(b, selectedMonth));
+      if (sppMonthBills.length === 0) return null;
+      const totalMonthSpp = sppMonthBills.reduce((sum, b) => sum + Number(b.nominal || 0), 0);
+      return {
+        ...summary,
+        sppMonthBills,
+        totalMonthSpp
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .filter(d => {
+      if (filterJenjang && d.student.grade_level !== filterJenjang) return false;
+      const className = d.student.classes?.class_name || (d.student as any).class_name || "";
+      if (filterKelas && className !== filterKelas) return false;
+      if (searchQuery && !d.student.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const classA = a.student.classes?.class_name || (a.student as any).class_name || "";
+      const classB = b.student.classes?.class_name || (b.student as any).class_name || "";
+      if (classA !== classB) return classA.localeCompare(classB);
+      return a.student.name.localeCompare(b.student.name);
+    });
+
+  const handleCopyMonthlyList = () => {
+    if (monthlyArrearsData.length === 0) {
+      alert("Tidak ada siswa yang tertunggak SPP pada bulan ini.");
+      return;
+    }
+    const headerText = `*Daftar Siswa Belum Bayar SPP (${selectedMonth})*\nTanggal: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`;
+    const listText = monthlyArrearsData.map((d, i) => {
+      const cls = d.student.classes?.class_name || (d.student as any).class_name || "-";
+      return `${i + 1}. *${d.student.name}* (Kelas ${cls}) - Rp ${d.totalMonthSpp.toLocaleString('id-ID')}`;
+    }).join('\n');
+    const totalText = `\n\n*Total: ${monthlyArrearsData.length} Siswa (Rp ${monthlyArrearsData.reduce((acc, d) => acc + d.totalMonthSpp, 0).toLocaleString('id-ID')})*`;
+    
+    navigator.clipboard.writeText(headerText + listText + totalText);
+    alert("✅ Daftar siswa belum bayar SPP berhasil disalin ke clipboard!");
+  };
+
+  const today = new Date();
+  const isReminderPeriod = today.getDate() >= 20;
+
   return (
     <div className="view-section">
-      <div className="mb-8 flex justify-between items-end">
+      <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h2 className="font-headline-lg text-headline-lg text-error tracking-tight">Laporan Tunggakan</h2>
           <p className="font-body-lg text-body-lg text-on-surface-variant mt-1">
             Daftar siswa yang belum melunasi kewajiban pembayaran SPP sesuai bulan berjalan.
           </p>
         </div>
-        <div className="flex gap-4 items-center">
-          <div className="relative flex items-center">
-            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
-            <input 
-              type="text"
-              placeholder="Cari nama siswa..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-outline-variant rounded-lg bg-surface focus:ring-primary focus:border-primary outline-none min-w-[200px]"
-            />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex border-b border-outline-variant mb-6 gap-6 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('semua')}
+          className={`pb-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'semua'
+              ? 'border-error text-error'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">list_alt</span>
+          Semua Tunggakan ({sortedData.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('bulanan')}
+          className={`pb-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'bulanan'
+              ? 'border-error text-error'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+          Pemberitahuan SPP Bulanan (Tgl 20+)
+          <span className="bg-error-container text-on-error-container text-xs px-2 py-0.5 rounded-full font-bold ml-1">
+            {monthlyArrearsData.length}
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'semua' ? (
+        <>
+          <div className="mb-6 flex justify-end">
+            <div className="flex gap-4 items-center flex-wrap">
+              <div className="relative flex items-center">
+                <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
+                <input 
+                  type="text"
+                  placeholder="Cari nama siswa..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-outline-variant rounded-lg bg-surface focus:ring-primary focus:border-primary outline-none min-w-[200px]"
+                />
+              </div>
+              <select 
+                value={filterJenjang}
+                onChange={(e) => setFilterJenjang(e.target.value)}
+                className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+              >
+                <option value="">Semua Jenjang</option>
+                <option value="SD">SD</option>
+                <option value="SMP">SMP</option>
+              </select>
+              <select 
+                value={filterKelas}
+                onChange={(e) => setFilterKelas(e.target.value)}
+                className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+              >
+                <option value="">Semua Kelas</option>
+                {availableClasses.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <select 
-            value={filterJenjang}
-            onChange={(e) => setFilterJenjang(e.target.value)}
-            className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
-          >
-            <option value="">Semua Jenjang</option>
-            <option value="SD">SD</option>
-            <option value="SMP">SMP</option>
-          </select>
-          <select 
-            value={filterKelas}
-            onChange={(e) => setFilterKelas(e.target.value)}
-            className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
-          >
-            <option value="">Semua Kelas</option>
-            {availableClasses.map(c => (
-              <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      
-      <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-surface-container-low border-b border-outline-variant">
-              <tr>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('jenjang')}>
-                  <div className="flex items-center gap-2">Jenjang {getSortIcon('jenjang')}</div>
-                </th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('nama')}>
-                  <div className="flex items-center gap-2">Nama Siswa {getSortIcon('nama')}</div>
-                </th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('kelas')}>
-                  <div className="flex items-center gap-2">Kelas {getSortIcon('kelas')}</div>
-                </th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('lama')}>
-                  <div className="flex items-center gap-2">Lama Menunggak {getSortIcon('lama')}</div>
-                </th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('total')}>
-                  <div className="flex items-center gap-2">Total Tunggakan {getSortIcon('total')}</div>
-                </th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Keterangan</th>
-                <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Tindakan</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant text-on-surface">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat data dari database... {loadingProgress > 0 && `(${loadingProgress.toLocaleString('id-ID')} tagihan)`}</td>
-                </tr>
-              ) : sortedData.length > 0 ? (
-                sortedData.map(d => (
-                  <tr key={d.student.id} className="hover:bg-surface-container-low/30">
-                    <td className="px-6 py-4">
-                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold mr-1">{d.student.grade_level}</span>
-                    </td>
-                    <td className="px-6 py-4 font-medium">{d.student.name}</td>
-                    <td className="px-6 py-4">{d.student.classes?.class_name || (d.student as any).class_name || '-'}</td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => setSelectedStudent(d)}
-                        className="text-error font-bold flex items-center gap-1 hover:underline hover:text-red-700 transition-colors"
-                        title="Klik untuk melihat rincian tagihan"
-                      >
-                        {d.totalUnpaidBills} Bulan/Tagihan
-                        <span className="material-symbols-outlined text-[16px]">info</span>
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-error flex items-center">
-                      {d.totalOriginalArrears > d.totalArrears && (
-                        <span className="line-through text-on-surface-variant text-xs mr-2 opacity-70">
-                          Rp {d.totalOriginalArrears.toLocaleString('id-ID')}
-                        </span>
-                      )}
-                      Rp {d.totalArrears.toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-6 py-4">
-                      {d.bills.some((b: any) => b.bulan_tagihan?.includes('T.A. Lalu')) ? (
-                        <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-bold border border-amber-200">
-                          Tunggakan T.A. Lalu
-                        </span>
-                      ) : (
-                        <span className="text-on-surface-variant text-sm">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => handleSendWA(d)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded flex items-center gap-1 font-medium transition-all shadow-sm"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
-                        </svg>
-                        Hubungi (WA)
-                      </button>
-                    </td>
+
+          <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead className="bg-surface-container-low border-b border-outline-variant">
+                  <tr>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('jenjang')}>
+                      <div className="flex items-center gap-2">Jenjang {getSortIcon('jenjang')}</div>
+                    </th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('nama')}>
+                      <div className="flex items-center gap-2">Nama Siswa {getSortIcon('nama')}</div>
+                    </th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('kelas')}>
+                      <div className="flex items-center gap-2">Kelas {getSortIcon('kelas')}</div>
+                    </th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('lama')}>
+                      <div className="flex items-center gap-2">Lama Menunggak {getSortIcon('lama')}</div>
+                    </th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 cursor-pointer hover:bg-surface-container-high transition-colors" onClick={() => handleSort('total')}>
+                      <div className="flex items-center gap-2">Total Tunggakan {getSortIcon('total')}</div>
+                    </th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Keterangan</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider sticky top-0">Tindakan</th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
-                    <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-3xl text-green-600">done_all</span>
-                    </div>
-                    <p className="font-bold text-lg text-on-surface">Hebat!</p>
-                    <p>Tidak ada siswa yang menunggak tagihan saat ini.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-outline-variant text-on-surface">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat data dari database... {loadingProgress > 0 && `(${loadingProgress.toLocaleString('id-ID')} tagihan)`}</td>
+                    </tr>
+                  ) : sortedData.length > 0 ? (
+                    sortedData.map(d => (
+                      <tr key={d.student.id} className="hover:bg-surface-container-low/30">
+                        <td className="px-6 py-4">
+                          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold mr-1">{d.student.grade_level}</span>
+                        </td>
+                        <td className="px-6 py-4 font-medium">{d.student.name}</td>
+                        <td className="px-6 py-4">{d.student.classes?.class_name || (d.student as any).class_name || '-'}</td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => setSelectedStudent(d)}
+                            className="text-error font-bold flex items-center gap-1 hover:underline hover:text-red-700 transition-colors"
+                            title="Klik untuk melihat rincian tagihan"
+                          >
+                            {d.totalUnpaidBills} Bulan/Tagihan
+                            <span className="material-symbols-outlined text-[16px]">info</span>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-error flex items-center">
+                          {d.totalOriginalArrears > d.totalArrears && (
+                            <span className="line-through text-on-surface-variant text-xs mr-2 opacity-70">
+                              Rp {d.totalOriginalArrears.toLocaleString('id-ID')}
+                            </span>
+                          )}
+                          Rp {d.totalArrears.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-6 py-4">
+                          {d.bills.some((b: any) => b.bulan_tagihan?.includes('T.A. Lalu')) ? (
+                            <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-bold border border-amber-200">
+                              Tunggakan T.A. Lalu
+                            </span>
+                          ) : (
+                            <span className="text-on-surface-variant text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => handleSendWA(d)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded flex items-center gap-1 font-medium transition-all shadow-sm"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
+                            </svg>
+                            Hubungi (WA)
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
+                        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-3xl text-green-600">done_all</span>
+                        </div>
+                        <p className="font-bold text-lg text-on-surface">Hebat!</p>
+                        <p>Tidak ada siswa yang menunggak tagihan saat ini.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Monthly Reminder Info Banner */}
+          <div className={`p-5 rounded-xl mb-6 border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+            isReminderPeriod 
+              ? 'bg-amber-50 border-amber-200 text-amber-950' 
+              : 'bg-blue-50 border-blue-200 text-blue-950'
+          }`}>
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-2xl mt-0.5 text-error">
+                {isReminderPeriod ? 'notification_important' : 'info'}
+              </span>
+              <div>
+                <div className="font-bold text-base flex items-center gap-2 flex-wrap">
+                  Pemberitahuan Tunggakan SPP ({selectedMonth})
+                  {isReminderPeriod ? (
+                    <span className="bg-amber-500 text-white text-xs px-2.5 py-0.5 rounded-full font-bold">
+                      Periode Pengingat Aktif (Tanggal 20+)
+                    </span>
+                  ) : (
+                    <span className="bg-blue-500 text-white text-xs px-2.5 py-0.5 rounded-full font-bold">
+                      Pengingat Bulanan
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm opacity-90 mt-1">
+                  {isReminderPeriod 
+                    ? `Hari ini tanggal ${today.getDate()} — Saat yang tepat untuk mengabari orang tua agar tidak menumpuk di bulan berikutnya. Fitur ini menampilkan khusus siswa yang belum melunasi SPP bulan berjalan tanpa perlu scroll tabel tunggakan keseluruhan.`
+                    : `Disarankan untuk mulai mengirimkan pemberitahuan SPP pada tanggal 20 ke atas setiap bulannya. Anda tetap dapat melihat dan mengabari orang tua kapan saja.`
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
+              <div className="text-right hidden sm:block">
+                <div className="text-xs opacity-75">Total SPP Belum Bayar</div>
+                <div className="font-bold text-lg text-error">
+                  Rp {monthlyArrearsData.reduce((acc, d) => acc + d.totalMonthSpp, 0).toLocaleString('id-ID')}
+                </div>
+              </div>
+              <button
+                onClick={handleCopyMonthlyList}
+                className="bg-white hover:bg-gray-50 border border-outline-variant text-on-surface font-bold text-sm px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-sm"
+                title="Salin daftar ke clipboard untuk dibagikan ke grup WA/Admin"
+              >
+                <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                Salin Daftar (WA)
+              </button>
+            </div>
+          </div>
+
+          {/* Filters for Monthly View */}
+          <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="font-bold text-sm text-on-surface-variant">Bulan Tagihan:</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="border border-outline-variant rounded-lg px-4 py-2 bg-surface font-bold text-primary focus:ring-primary focus:border-primary outline-none"
+              >
+                {getAvailableMonths().map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-4 items-center flex-wrap">
+              <div className="relative flex items-center">
+                <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
+                <input 
+                  type="text"
+                  placeholder="Cari nama siswa..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-outline-variant rounded-lg bg-surface focus:ring-primary focus:border-primary outline-none min-w-[200px]"
+                />
+              </div>
+              <select 
+                value={filterJenjang}
+                onChange={(e) => setFilterJenjang(e.target.value)}
+                className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+              >
+                <option value="">Semua Jenjang</option>
+                <option value="SD">SD</option>
+                <option value="SMP">SMP</option>
+              </select>
+              <select 
+                value={filterKelas}
+                onChange={(e) => setFilterKelas(e.target.value)}
+                className="border border-outline-variant rounded-lg px-4 py-2 bg-surface focus:ring-primary focus:border-primary outline-none"
+              >
+                <option value="">Semua Kelas</option>
+                {availableClasses.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead className="bg-surface-container-low border-b border-outline-variant">
+                  <tr>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">No</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">Jenjang</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">Nama Siswa</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">Kelas</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">Tagihan SPP ({selectedMonth})</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">Total Semua Tunggakan</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">No. WhatsApp</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant text-on-surface">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-on-surface-variant">Memuat data dari database...</td>
+                    </tr>
+                  ) : monthlyArrearsData.length > 0 ? (
+                    monthlyArrearsData.map((d, idx) => (
+                      <tr key={d.student.id} className="hover:bg-surface-container-low/30">
+                        <td className="px-6 py-4 text-on-surface-variant font-data-mono">{idx + 1}</td>
+                        <td className="px-6 py-4">
+                          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold mr-1">{d.student.grade_level}</span>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-on-surface">{d.student.name}</td>
+                        <td className="px-6 py-4 font-medium">{d.student.classes?.class_name || (d.student as any).class_name || '-'}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-error">
+                            Rp {d.totalMonthSpp.toLocaleString('id-ID')}
+                          </div>
+                          <div className="text-xs text-on-surface-variant mt-0.5">
+                            {d.sppMonthBills.map(b => b.jenis_tagihan).join(', ')}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => setSelectedStudent(d)}
+                            className="text-error font-bold flex items-center gap-1 hover:underline hover:text-red-700 transition-colors"
+                            title="Klik untuk melihat rincian seluruh tagihan"
+                          >
+                            Rp {d.totalArrears.toLocaleString('id-ID')} ({d.totalUnpaidBills} bln)
+                            <span className="material-symbols-outlined text-[16px]">info</span>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 font-data-mono text-sm">
+                          {d.student.parent_phone ? (
+                            <span className="text-on-surface-variant">{d.student.parent_phone}</span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => handleSendWA(d)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded flex items-center gap-1 font-medium transition-all shadow-sm"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
+                            </svg>
+                            Hubungi (WA)
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
+                        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-3xl text-green-600">done_all</span>
+                        </div>
+                        <p className="font-bold text-lg text-on-surface">Semua Lunas!</p>
+                        <p className="text-sm">Tidak ada siswa yang menunggak SPP pada bulan {selectedMonth}.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Modal Rincian */}
       {selectedStudent && createPortal(
