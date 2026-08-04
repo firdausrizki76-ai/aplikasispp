@@ -485,7 +485,10 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
       const cls = d.student.classes?.class_name || (d.student as any).class_name || "-";
       return `${i + 1}. *${d.student.name}* (Kelas ${cls}) - Rp ${d.totalMonthSpp.toLocaleString('id-ID')}`;
     }).join('\n');
-    const totalText = `\n\n*Total: ${monthlyArrearsData.length} Siswa (Rp ${monthlyArrearsData.reduce((acc, d) => acc + d.totalMonthSpp, 0).toLocaleString('id-ID')})*`;
+    const totalAmount = monthlyArrearsData.reduce((acc, d) => acc + d.totalMonthSpp, 0).toLocaleString('id-ID');
+    const totalText = userRole === 'pimpinan'
+      ? `\n\n*Total: ${monthlyArrearsData.length} Siswa (Rp ${totalAmount})*`
+      : `\n\n*Total: ${monthlyArrearsData.length} Siswa*`;
     
     navigator.clipboard.writeText(headerText + listText + totalText);
     alert("✅ Daftar siswa belum bayar SPP berhasil disalin ke clipboard!");
@@ -697,12 +700,14 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
               </div>
             </div>
             <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
-              <div className="text-right hidden sm:block">
-                <div className="text-xs opacity-75">Total SPP Belum Bayar</div>
-                <div className="font-bold text-lg text-error">
-                  Rp {monthlyArrearsData.reduce((acc, d) => acc + d.totalMonthSpp, 0).toLocaleString('id-ID')}
+              {userRole === 'pimpinan' && (
+                <div className="text-right hidden sm:block">
+                  <div className="text-xs opacity-75">Total SPP Belum Bayar</div>
+                  <div className="font-bold text-lg text-error">
+                    Rp {monthlyArrearsData.reduce((acc, d) => acc + d.totalMonthSpp, 0).toLocaleString('id-ID')}
+                  </div>
                 </div>
-              </div>
+              )}
               <button
                 onClick={handleCopyMonthlyList}
                 className="bg-white hover:bg-gray-50 border border-outline-variant text-on-surface font-bold text-sm px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-sm"
