@@ -29,45 +29,66 @@ export async function GET(request: Request) {
     const step = 1000;
     
     let query = supabaseAdmin.from('student_bills')
-      .select('*, students!inner(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
+      .select('*, students(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
       .gte('tanggal_jatuh_tempo', `${startDate}`)
       .lte('tanggal_jatuh_tempo', `${endDate}`);
       
     if (jenisTagihan && jenisTagihan !== 'Semua') {
       query = query.eq('jenis_tagihan', jenisTagihan);
     }
-    
-    if (jenisSekolah && jenisSekolah !== 'Semua') {
-      // Using ilike on the joined students table
-      query = query.ilike('students.grade_level', `%${jenisSekolah}%`);
-    }
 
+    const concurrency = 5;
     while (true) {
-      const { data, error } = await query
-        .order('id')
-        .range(from, from + step - 1);
-        
-      if (error) break;
-      if (data) {
-        allBills = [...allBills, ...data];
-        if (data.length < step) break;
-      } else {
-        break;
+      const promises = [];
+      for (let i = 0; i < concurrency; i++) {
+        const offset = from + (i * step);
+        promises.push(query.order('id').range(offset, offset + step - 1));
       }
-      from += step;
+      
+      const results = await Promise.all(promises);
+      let breakLoop = false;
+      
+      for (const res of results) {
+        if (res.error) {
+          breakLoop = true;
+          break;
+        }
+        if (res.data) {
+          allBills.push(...res.data);
+          if (res.data.length < step) {
+            breakLoop = true;
+          }
+        } else {
+          breakLoop = true;
+        }
+      }
+      
+      if (breakLoop) break;
+      from += step * concurrency;
     }
 
     // 2. Fetch sales
     let salesQuery = supabaseAdmin.from('sales')
-      .select('*, students!inner(name, grade_level)')
+      .select('*, students(name, grade_level, classes(grade_level))')
       .gte('created_at', `${startDate}T00:00:00Z`)
       .lte('created_at', `${endDate}T23:59:59Z`);
       
-    if (jenisSekolah && jenisSekolah !== 'Semua') {
-      salesQuery = salesQuery.ilike('students.grade_level', `%${jenisSekolah}%`);
-    }
+    const { data: salesRaw } = await salesQuery;
+    let sales = salesRaw || [];
     
-    const { data: sales } = await salesQuery;
+    // JS Filtering for jenisSekolah to properly check both student and class grade_level
+    if (jenisSekolah && jenisSekolah !== 'Semua') {
+      const searchKey = jenisSekolah.toUpperCase();
+      allBills = allBills.filter(b => {
+        const gl = (b.students?.classes?.grade_level || b.students?.grade_level || "").toUpperCase();
+        return gl.includes(searchKey);
+      });
+      
+      sales = sales.filter(s => {
+        const gl = (s.students?.classes?.grade_level || s.students?.grade_level || "").toUpperCase();
+        return gl.includes(searchKey);
+      });
+    }
 
     // 3. Fetch students for report generation
     const { data: students } = await supabaseAdmin.from('students')
