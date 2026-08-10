@@ -26,6 +26,11 @@ export default function LaporanPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // Category filters
+  const [jenisTagihan, setJenisTagihan] = useState("Semua");
+  const [jenisSekolah, setJenisSekolah] = useState("Semua");
+  const [masterTagihanList, setMasterTagihanList] = useState<string[]>([]);
+
   // Download Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">("excel");
@@ -64,7 +69,7 @@ export default function LaporanPage() {
     
     setLoading(true);
     try {
-      const cacheKey = `laporan_cache_v2_${startDate}_${endDate}`;
+      const cacheKey = `laporan_cache_v3_${startDate}_${endDate}_${jenisTagihan}_${jenisSekolah}`;
       let data = null;
       try {
         const cached = sessionStorage.getItem(cacheKey);
@@ -72,12 +77,16 @@ export default function LaporanPage() {
       } catch (e) {}
 
       if (!data) {
-        const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+        const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}&jenisTagihan=${encodeURIComponent(jenisTagihan)}&jenisSekolah=${encodeURIComponent(jenisSekolah)}`);
         if (!res.ok) throw new Error("Gagal mengambil data laporan");
         data = await res.json();
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify(data));
         } catch (e) {}
+      }
+
+      if (masterTagihanList.length === 0 && data.master_tagihan) {
+        setMasterTagihanList(data.master_tagihan.map((m: any) => m.nama_tagihan));
       }
       
       const bills = data.bills || [];
@@ -133,7 +142,7 @@ export default function LaporanPage() {
 
   useEffect(() => {
     fetchData();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, jenisTagihan, jenisSekolah]);
 
   const setTahunAjaranIni = () => {
     const today = new Date();
@@ -181,7 +190,7 @@ export default function LaporanPage() {
 
   const generateSekolahReport = async (jenjang: "SD" | "SMP") => {
     // Fetch all required data from API to bypass RLS
-    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}&jenisTagihan=${encodeURIComponent(jenisTagihan)}&jenisSekolah=${encodeURIComponent(jenisSekolah)}`);
     if (!res.ok) throw new Error("Gagal mengambil data untuk laporan");
     const data = await res.json();
     
@@ -351,7 +360,7 @@ export default function LaporanPage() {
   };
 
   const generateSeragamReport = async (jenjang: "SD" | "SMP") => {
-    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}&jenisTagihan=${encodeURIComponent(jenisTagihan)}&jenisSekolah=${encodeURIComponent(jenisSekolah)}`);
     if (!res.ok) throw new Error("Gagal mengambil data untuk laporan");
     const data = await res.json();
     const salesRaw = data.sales || [];
@@ -420,7 +429,7 @@ export default function LaporanPage() {
       return;
     }
 
-    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}`);
+    const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}&jenisTagihan=${encodeURIComponent(jenisTagihan)}&jenisSekolah=${encodeURIComponent(jenisSekolah)}`);
     if (!res.ok) throw new Error("Gagal mengambil data untuk laporan");
     const data = await res.json();
     
@@ -525,6 +534,31 @@ export default function LaporanPage() {
             onChange={e => { setEndDate(e.target.value); setSelectedTA(""); }}
             className="border border-gray-300 rounded-lg px-3 py-2 w-40 text-sm focus:ring-2 focus:ring-primary outline-none"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1">Jenis Tagihan</label>
+          <select 
+            value={jenisTagihan}
+            onChange={e => setJenisTagihan(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-48 text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+          >
+            <option value="Semua">Semua Tagihan</option>
+            {masterTagihanList.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1">Jenjang Sekolah</label>
+          <select 
+            value={jenisSekolah}
+            onChange={e => setJenisSekolah(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-36 text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+          >
+            <option value="Semua">Semua Jenjang</option>
+            <option value="SD">SD</option>
+            <option value="SMP">SMP</option>
+          </select>
         </div>
       </div>
 

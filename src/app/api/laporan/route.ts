@@ -6,6 +6,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const jenisTagihan = searchParams.get('jenisTagihan');
+    const jenisSekolah = searchParams.get('jenisSekolah');
 
     if (!startDate || !endDate) {
       return NextResponse.json({ error: "startDate dan endDate diperlukan" }, { status: 400 });
@@ -26,11 +28,23 @@ export async function GET(request: Request) {
     let from = 0;
     const step = 1000;
     
+    let query = supabaseAdmin.from('student_bills')
+      .select('*, students!inner(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
+      .gte('tanggal_jatuh_tempo', `${startDate}`)
+      .lte('tanggal_jatuh_tempo', `${endDate}`);
+      
+    if (jenisTagihan && jenisTagihan !== 'Semua') {
+      query = query.eq('jenis_tagihan', jenisTagihan);
+    }
+    
+    if (jenisSekolah && jenisSekolah !== 'Semua') {
+      // Using ilike on the joined students table
+      query = query.ilike('students.grade_level', `%${jenisSekolah}%`);
+    }
+
     while (true) {
-      const { data, error } = await supabaseAdmin.from('student_bills')
-        .select('*, students(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
-        .gte('tanggal_jatuh_tempo', `${startDate}`)
-        .lte('tanggal_jatuh_tempo', `${endDate}`)
+      const { data, error } = await query
+        .order('id')
         .range(from, from + step - 1);
         
       if (error) break;
@@ -44,10 +58,16 @@ export async function GET(request: Request) {
     }
 
     // 2. Fetch sales
-    const { data: sales } = await supabaseAdmin.from('sales')
-      .select('*, students(name, grade_level)')
+    let salesQuery = supabaseAdmin.from('sales')
+      .select('*, students!inner(name, grade_level)')
       .gte('created_at', `${startDate}T00:00:00Z`)
       .lte('created_at', `${endDate}T23:59:59Z`);
+      
+    if (jenisSekolah && jenisSekolah !== 'Semua') {
+      salesQuery = salesQuery.ilike('students.grade_level', `%${jenisSekolah}%`);
+    }
+    
+    const { data: sales } = await salesQuery;
 
     // 3. Fetch students for report generation
     const { data: students } = await supabaseAdmin.from('students')
