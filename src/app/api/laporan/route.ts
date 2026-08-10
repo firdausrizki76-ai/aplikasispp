@@ -28,21 +28,24 @@ export async function GET(request: Request) {
     let from = 0;
     const step = 1000;
     
-    let query = supabaseAdmin.from('student_bills')
-      .select('*, students(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
-      .gte('tanggal_jatuh_tempo', `${startDate}`)
-      .lte('tanggal_jatuh_tempo', `${endDate}`);
-      
-    if (jenisTagihan && jenisTagihan !== 'Semua') {
-      query = query.eq('jenis_tagihan', jenisTagihan);
-    }
+    const getQuery = () => {
+      let q = supabaseAdmin.from('student_bills')
+        .select('*, students(grade_level, name, classes(class_name, grade_level)), payment_transactions(payment_date)')
+        .gte('tanggal_jatuh_tempo', `${startDate}`)
+        .lte('tanggal_jatuh_tempo', `${endDate}`);
+        
+      if (jenisTagihan && jenisTagihan !== 'Semua') {
+        q = q.eq('jenis_tagihan', jenisTagihan);
+      }
+      return q;
+    };
 
     const concurrency = 5;
     while (true) {
       const promises = [];
       for (let i = 0; i < concurrency; i++) {
         const offset = from + (i * step);
-        promises.push(query.order('id').range(offset, offset + step - 1));
+        promises.push(getQuery().order('id').range(offset, offset + step - 1));
       }
       
       const results = await Promise.all(promises);
