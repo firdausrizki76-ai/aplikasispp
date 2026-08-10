@@ -69,7 +69,7 @@ export default function LaporanPage() {
     
     setLoading(true);
     try {
-      const cacheKey = `laporan_cache_v3_${startDate}_${endDate}_${jenisTagihan}_${jenisSekolah}`;
+      const cacheKey = `laporan_cache_v4_${startDate}_${endDate}_${jenisTagihan}_${jenisSekolah}`;
       let data = null;
       try {
         const cached = sessionStorage.getItem(cacheKey);
