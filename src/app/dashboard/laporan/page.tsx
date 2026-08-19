@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
 import * as XLSX from "xlsx";
@@ -9,6 +9,7 @@ import autoTable from "jspdf-autotable";
 
 export default function LaporanPage() {
   const [loading, setLoading] = useState(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Stats for cards
   const [stats, setStats] = useState({ 
@@ -67,23 +68,21 @@ export default function LaporanPage() {
   const fetchData = async () => {
     if (!startDate || !endDate) return;
     
+    // Abort previous in-flight request to prevent race conditions
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
-      const cacheKey = `laporan_cache_v4_${startDate}_${endDate}_${jenisTagihan}_${jenisSekolah}`;
-      let data = null;
-      try {
-        const cached = sessionStorage.getItem(cacheKey);
-        if (cached) data = JSON.parse(cached);
-      } catch (e) {}
-
-      if (!data) {
-        const res = await fetch(`/api/laporan?startDate=${startDate}&endDate=${endDate}&jenisTagihan=${encodeURIComponent(jenisTagihan)}&jenisSekolah=${encodeURIComponent(jenisSekolah)}`);
-        if (!res.ok) throw new Error("Gagal mengambil data laporan");
-        data = await res.json();
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify(data));
-        } catch (e) {}
-      }
+      const res = await fetch(
+        `/api/laporan?startDate=${startDate}&endDate=${endDate}&jenisTagihan=${encodeURIComponent(jenisTagihan)}&jenisSekolah=${encodeURIComponent(jenisSekolah)}`,
+        { signal: controller.signal }
+      );
+      if (!res.ok) throw new Error("Gagal mengambil data laporan");
+      const data = await res.json();
 
       if (masterTagihanList.length === 0 && data.master_tagihan) {
         setMasterTagihanList(data.master_tagihan.map((m: any) => m.nama_tagihan));
@@ -101,8 +100,8 @@ export default function LaporanPage() {
       const newClassStats: Record<string, { total: number, lunas: number, jenjang: string }> = {};
 
       bills.forEach((b: any) => {
-        const gl = (b.students as any)?.classes?.grade_level?.toUpperCase() || (b.students as any)?.grade_level?.toUpperCase() || "";
-        const className = (b.students as any)?.classes?.class_name || (b.students as any)?.class_name || "Tanpa Kelas";
+        const gl = (b.students?.classes?.grade_level || b.students?.grade_level || "").toUpperCase();
+        const className = b.students?.classes?.class_name || b.students?.class_name || "Tanpa Kelas";
         const isLunas = b.status?.toLowerCase() === 'lunas';
 
         if (gl.includes("SD")) {
@@ -132,13 +131,17 @@ export default function LaporanPage() {
         percentLunasSD: sdBillsTotal > 0 ? Math.round((sdBillsLunas / sdBillsTotal) * 100) : 0,
         percentLunasSMP: smpBillsTotal > 0 ? Math.round((smpBillsLunas / smpBillsTotal) * 100) : 0
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
       console.error(error);
       alert("Terjadi kesalahan saat memuat laporan.");
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
   };
+
 
   useEffect(() => {
     fetchData();
@@ -440,9 +443,9 @@ export default function LaporanPage() {
     const classStats: Record<string, { total: number, lunas: number }> = {};
 
     bills.forEach((b: any) => {
-      const gl = b.students?.grade_level || "";
+      const gl = (b.students?.classes?.grade_level || b.students?.grade_level || "").toUpperCase();
       if (gl.includes(jenjang)) {
-        const className = b.students?.classes?.class_name || "Tanpa Kelas";
+        const className = b.students?.classes?.class_name || b.students?.class_name || "Tanpa Kelas";
         if (!classStats[className]) classStats[className] = { total: 0, lunas: 0 };
         
         classStats[className].total += 1;
@@ -540,9 +543,12 @@ export default function LaporanPage() {
           <select 
             value={jenisTagihan}
             onChange={e => setJenisTagihan(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-48 text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+            className="border border-gray-300 rounded-lg px-3 py-2 w-60 text-sm focus:ring-2 focus:ring-primary outline-none bg-white font-medium"
           >
             <option value="Semua">Semua Tagihan</option>
+            <option value="SEMUA_SPP_SD" className="font-semibold text-blue-700">SEMUA SPP SD (Semua Kelas)</option>
+            <option value="SEMUA_SPP_SMP" className="font-semibold text-purple-700">SEMUA SPP SMP (Semua Kelas)</option>
+            <option disabled>──────────</option>
             {masterTagihanList.map(m => (
               <option key={m} value={m}>{m}</option>
             ))}
