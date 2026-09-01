@@ -33,12 +33,8 @@ export default function PembayaranPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<StudentWithClass[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentWithClass | null>(null);
-  
-  const [unpaidBills, setUnpaidBills] = useState<StudentBill[]>([]);
-  const [loadingBills, setLoadingBills] = useState(false);
+
   const [masterBillsMap, setMasterBillsMap] = useState<Record<string, number>>({});
-  
-  // Selected bills to pay and their amounts
   const [selectedBillsToPay, setSelectedBillsToPay] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,17 +45,28 @@ export default function PembayaranPage() {
     // Fetch students
     const { data: students } = await supabase.from("students").select("*, classes(class_name)").order("name", { ascending: true });
     
-    // Fetch payment totals
-    const { data: payments } = await supabase.from("payment_transactions").select("student_id, amount");
+    // Fetch all payment totals (loop to bypass 1000 limit)
+    let allPayments: any[] = [];
+    let paymentsFrom = 0;
+    const step = 1000;
+    while (true) {
+      const { data: pData, error: pErr } = await supabase
+        .from("payment_transactions")
+        .select("student_id, amount")
+        .range(paymentsFrom, paymentsFrom + step - 1);
+      
+      if (pErr || !pData) break;
+      allPayments = [...allPayments, ...pData];
+      if (pData.length < step) break;
+      paymentsFrom += step;
+    }
     
     if (students) {
       // Calculate total paid per student
       const totalsMap = new Map<string, number>();
-      if (payments) {
-        payments.forEach(p => {
-          totalsMap.set(p.student_id, (totalsMap.get(p.student_id) || 0) + p.amount);
-        });
-      }
+      allPayments.forEach(p => {
+        totalsMap.set(p.student_id, (totalsMap.get(p.student_id) || 0) + (Number(p.amount) || 0));
+      });
       
       const mapped = students.map(s => ({
         ...s,
@@ -85,6 +92,9 @@ export default function PembayaranPage() {
   useEffect(() => {
     fetchStudentsWithPayments();
   }, []);
+
+  const [unpaidBills, setUnpaidBills] = useState<StudentBill[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
 
   // Search logic
   useEffect(() => {
