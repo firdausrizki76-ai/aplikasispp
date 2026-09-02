@@ -106,7 +106,8 @@ export default function SeragamPage() {
     // Check role
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      setUserRole(user.user_metadata?.role || '');
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      setUserRole(profile?.role || user.user_metadata?.role || 'admin');
     }
     
     setLoading(false);
@@ -489,9 +490,16 @@ export default function SeragamPage() {
         <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Total Omzet</p>
-            <p className="text-2xl font-bold text-emerald-700 mt-1">
-              {loading ? "..." : `Rp ${totalSalesRevenue.toLocaleString('id-ID')}`}
-            </p>
+            {userRole === 'pimpinan' ? (
+              <p className="text-2xl font-bold text-emerald-700 mt-1">
+                {loading ? "..." : `Rp ${totalSalesRevenue.toLocaleString('id-ID')}`}
+              </p>
+            ) : (
+              <div className="flex items-center gap-1.5 mt-2 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[18px] text-outline">lock</span>
+                <span className="text-xs font-bold px-2 py-0.5 bg-surface-container rounded-md">Khusus Pimpinan</span>
+              </div>
+            )}
           </div>
           <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <span className="material-symbols-outlined text-2xl">payments</span>
