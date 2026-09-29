@@ -20,20 +20,52 @@ export async function POST(req: Request) {
 
     // Revert bill status and nominal
     if (bill_id) {
-      // Fetch current bill nominal
-      const { data: bill } = await supabaseAdmin.from('student_bills').select('nominal').eq('id', bill_id).single();
-      const currentNominal = bill ? Number(bill.nominal) : 0;
-      const amountToRestore = Number(trx.amount);
-      
-      const restoredNominal = currentNominal + amountToRestore;
-      
-      const { error: updateError } = await supabaseAdmin.from('student_bills').update({ 
-        status: 'Belum Lunas',
-        nominal: restoredNominal
-      }).eq('id', bill_id);
-      
-      if (updateError) {
-        throw new Error("Gagal memulihkan tagihan: " + updateError.message);
+      // Check if there are other transactions for this same bill (e.g. duplicate payments)
+      const { data: otherTxs } = await supabaseAdmin
+        .from('payment_transactions')
+        .select('amount')
+        .eq('bill_id', bill_id)
+        .neq('id', trx_id);
+
+      const totalOtherPaid = (otherTxs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+      const { data: bill } = await supabaseAdmin
+        .from('student_bills')
+        .select('nominal, status, jenis_tagihan')
+        .eq('id', bill_id)
+        .single();
+
+      if (bill) {
+        if (totalOtherPaid > 0) {
+          // If other transactions already covered the bill (like a duplicate transaction), keep it Lunas
+          const { data: masterTagihan } = await supabaseAdmin
+            .from('master_tagihan')
+            .select('nominal_default')
+            .eq('nama_tagihan', bill.jenis_tagihan)
+            .single();
+
+          const expectedTotal = masterTagihan ? Number(masterTagihan.nominal_default) : Number(trx.amount);
+          if (totalOtherPaid >= expectedTotal) {
+            await supabaseAdmin.from('student_bills').update({
+              status: 'Lunas',
+              nominal: 0
+            }).eq('id', bill_id);
+          } else {
+            const restoredNominal = Math.max(0, expectedTotal - totalOtherPaid);
+            await supabaseAdmin.from('student_bills').update({
+              status: restoredNominal <= 0 ? 'Lunas' : 'Belum Lunas',
+              nominal: restoredNominal
+            }).eq('id', bill_id);
+          }
+        } else {
+          // No other transactions exist, restore original nominal
+          const currentNominal = Number(bill.nominal) || 0;
+          const restoredNominal = currentNominal + Number(trx.amount);
+          await supabaseAdmin.from('student_bills').update({ 
+            status: 'Belum Lunas',
+            nominal: restoredNominal
+          }).eq('id', bill_id);
+        }
       }
     }
 

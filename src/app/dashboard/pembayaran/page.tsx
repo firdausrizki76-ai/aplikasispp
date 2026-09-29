@@ -2,7 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { clearTunggakanCache } from "@/utils/tunggakanCache";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Database } from "@/utils/supabase/database.types";
 import { createPortal } from "react-dom";
 
@@ -37,6 +37,7 @@ export default function PembayaranPage() {
   const [masterBillsMap, setMasterBillsMap] = useState<Record<string, number>>({});
   const [selectedBillsToPay, setSelectedBillsToPay] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const fetchStudentsWithPayments = async () => {
     setLoading(true);
@@ -152,67 +153,54 @@ export default function PembayaranPage() {
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     if (!selectedStudent || Object.keys(selectedBillsToPay).length === 0) {
       alert("Pilih siswa dan minimal 1 tagihan untuk dibayar.");
       return;
     }
 
-    setIsSubmitting(true);
-    const supabase = createClient();
-    const totalToPay = calculateTotal();
-    const receiptId = `TRX-${new Date().getTime()}`;
-
-    // Get selected bills
-    const billsToPay = unpaidBills.filter(b => selectedBillsToPay[b.id] !== undefined);
-
-    try {
-      // 1. Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // 2. Insert into payment_transactions
-      const transactionsToInsert = billsToPay.map(bill => ({
-        receipt_id: receiptId,
-        student_id: selectedStudent.id,
-        bill_id: bill.id,
-        jenis_tagihan: `${bill.jenis_tagihan} ${bill.bulan_tagihan}`,
-        amount: selectedBillsToPay[bill.id],
-        admin_id: user?.id || null
+    const billsToPay = unpaidBills
+      .filter(b => selectedBillsToPay[b.id] !== undefined)
+      .map(b => ({
+        billId: b.id,
+        amount: selectedBillsToPay[b.id]
       }));
 
-      const { error: txError } = await supabase.from("payment_transactions").insert(transactionsToInsert);
-      if (txError) throw txError;
+    if (billsToPay.length === 0) {
+      alert("Pilih minimal 1 tagihan untuk dibayar.");
+      return;
+    }
 
-      // 3. Update student_bills status to Lunas if fully paid, otherwise reduce nominal
-      const billUpdates = billsToPay.map(bill => {
-        const payAmount = selectedBillsToPay[bill.id];
-        const newNominal = bill.nominal - payAmount;
-        const status = newNominal <= 0 ? "Lunas" : "Belum Lunas";
-        return { billId: bill.id, nominal: newNominal, status };
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const res = await fetch('/api/payments/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: selectedStudent.id,
+          studentName: selectedStudent.name,
+          bills: billsToPay,
+          userId: user?.id || null
+        })
       });
-      if (billUpdates.length > 0) {
-        const payload = {
-          updates: billUpdates,
-          userId: user?.id,
-          actionDetails: `Menerima pembayaran untuk ${billUpdates.length} tagihan siswa ${selectedStudent.name}`
-        };
 
-        const res = await fetch('/api/bills/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const updateData = await res.json();
-        if (!res.ok || !updateData.success) {
-          throw new Error("Gagal mengupdate status tagihan: " + (updateData.error || ""));
-        }
+      const updateData = await res.json();
+      if (!res.ok || !updateData.success) {
+        throw new Error(updateData.error || "Gagal mencatat pembayaran.");
       }
 
-      alert("Pembayaran berhasil dicatat!");
+      // Tutup modal dan reset state segera
       setIsModalOpen(false);
       setSelectedStudent(null);
       setSearchQuery("");
       setUnpaidBills([]);
       setSelectedBillsToPay({});
+
+      alert(`Pembayaran berhasil dicatat!\nNo. Resi: ${updateData.receiptId}`);
       
       try { clearTunggakanCache(); } catch(e) {}
       
@@ -222,11 +210,12 @@ export default function PembayaranPage() {
     } catch (err: any) {
       alert("Gagal memproses pembayaran: " + err.message);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
-  const [mounted, setMounted] = useState(false);
+    const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
