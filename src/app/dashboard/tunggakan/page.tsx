@@ -534,8 +534,10 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
         const nonSppBills = (summary.bills || []).filter((b: any) => {
           const isNonSpp = !(b.jenis_tagihan || "").toLowerCase().startsWith("spp");
           if (!isNonSpp) return false;
-          if (selectedOtherBillType !== "ALL" && b.jenis_tagihan !== selectedOtherBillType) return false;
-          if (selectedOtherMonth !== "ALL" && b.bulan_tagihan !== selectedOtherMonth) return false;
+          const billName = (b.jenis_tagihan || "").trim();
+          const billMonth = (b.bulan_tagihan || "").trim();
+          if (selectedOtherBillType !== "ALL" && billName.toLowerCase() !== selectedOtherBillType.trim().toLowerCase()) return false;
+          if (selectedOtherMonth !== "ALL" && billMonth.toLowerCase() !== selectedOtherMonth.trim().toLowerCase()) return false;
           return true;
         });
         if (nonSppBills.length === 0) return null;
@@ -631,6 +633,17 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
             Daftar siswa yang belum melunasi kewajiban SPP bulanan maupun tagihan kegiatan/administrasi lainnya.
           </p>
         </div>
+        <button
+          onClick={() => fetchArrears(true)}
+          disabled={loading}
+          className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant rounded-xl flex items-center gap-2 text-sm font-medium transition-all shadow-sm disabled:opacity-50 shrink-0"
+          title="Segarkan Data dari Database"
+        >
+          <span className={`material-symbols-outlined text-lg ${loading ? 'animate-spin' : ''}`}>
+            refresh
+          </span>
+          <span>Refresh Data</span>
+        </button>
       </div>
 
       {/* Tab Navigation */}

@@ -2,7 +2,8 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { formatWhatsAppNumber } from "@/utils/phone";
-import { useEffect, useState, useRef } from "react";
+import { getDefaultPPDBAcademicYear, getDynamicAcademicYears } from "@/utils/academicYear";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 
 interface Installment {
@@ -69,6 +70,8 @@ export default function PSBPage() {
   const [userRole, setUserRole] = useState("admin");
   const [userId, setUserId] = useState<string | null>(null);
 
+  const defaultAcademicYear = useMemo(() => getDefaultPPDBAcademicYear(), []);
+
   // Candidates & State
   const [candidates, setCandidates] = useState<PSBCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,10 +79,15 @@ export default function PSBPage() {
   const [mounted, setMounted] = useState(false);
 
   // Filters
-  const [filterYear, setFilterYear] = useState<string>("2027/2028");
+  const [filterYear, setFilterYear] = useState<string>(defaultAcademicYear);
   const [filterGrade, setFilterGrade] = useState<string>("ALL");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Dynamic Academic Year Options (auto-advancing + preserves DB history)
+  const academicYearOptions = useMemo(() => {
+    return getDynamicAcademicYears(candidates.map((c) => c.academic_year));
+  }, [candidates]);
 
   // Summary Metrics
   const [summary, setSummary] = useState({
@@ -103,7 +111,7 @@ export default function PSBPage() {
     parent_name: "",
     parent_phone: "",
     target_grade: "SD" as "SD" | "SMP",
-    academic_year: "2027/2028",
+    academic_year: defaultAcademicYear,
     base_amount: 6900000,
     discount_type: "Tanpa Diskon",
     discount_amount: 0,
@@ -246,7 +254,7 @@ export default function PSBPage() {
           parent_name: "",
           parent_phone: "",
           target_grade: "SD",
-          academic_year: "2027/2028",
+          academic_year: defaultAcademicYear,
           base_amount: 6900000,
           discount_type: "Tanpa Diskon",
           discount_amount: 0,
@@ -512,7 +520,7 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
               </h2>
             </div>
             <p className="font-body-md text-on-surface-variant mt-1">
-              Kelola pendaftaran PPDB T.A. 2027/2028, skema potongan harga/diskon, sistem cicilan uang masuk, dan sinkronisasi penempatan kelas.
+              Kelola pendaftaran PPDB (uang masuk), skema potongan harga/diskon, sistem cicilan uang masuk, dan sinkronisasi penempatan kelas.
             </p>
           </div>
 
@@ -601,9 +609,12 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
                 onChange={(e) => setFilterYear(e.target.value)}
                 className="bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus:ring-1 focus:ring-primary"
               >
-                <option value="2027/2028">2027/2028 (PPDB Baru)</option>
-                <option value="2026/2027">2026/2027</option>
                 <option value="ALL">Semua Tahun</option>
+                {academicYearOptions.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr} {yr === defaultAcademicYear ? "(PPDB Baru)" : ""}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -908,7 +919,7 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
               <div>
                 <h3 className="font-headline-md text-primary font-bold text-xl">Daftar Calon Siswa Baru (PPDB)</h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Tahun Ajaran 2027/2028 - SD &amp; SMP Taruna Islam Pekanbaru
+                  Tahun Ajaran {addForm.academic_year} - SD &amp; SMP Taruna Islam Pekanbaru
                 </p>
               </div>
               <button
@@ -920,9 +931,9 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
-              {/* Row 1: Nama & Jenjang */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
+              {/* Row 1: Nama, Jenjang & Tahun Ajaran */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div className="md:col-span-6">
                   <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
                     Nama Lengkap Calon Siswa *
                   </label>
@@ -936,7 +947,7 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
                   />
                 </div>
 
-                <div>
+                <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
                     Jenjang Sekolah *
                   </label>
@@ -947,6 +958,23 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
                   >
                     <option value="SD">SD Taruna Islam</option>
                     <option value="SMP">SMP Taruna Islam</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Tahun Ajaran *
+                  </label>
+                  <select
+                    value={addForm.academic_year}
+                    onChange={(e) => setAddForm({ ...addForm, academic_year: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold bg-white"
+                  >
+                    {academicYearOptions.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr} {yr === defaultAcademicYear ? "(PPDB Baru)" : ""}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

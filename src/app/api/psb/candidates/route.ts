@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { insertAuditLog } from '@/utils/audit';
 import { normalizePhone } from '@/utils/phone';
+import { getDefaultPPDBAcademicYear } from '@/utils/academicYear';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -10,7 +11,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const academicYear = searchParams.get('academic_year') || '2027/2028';
+    const academicYear = searchParams.get('academic_year') || getDefaultPPDBAcademicYear();
     const targetGrade = searchParams.get('target_grade');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
       parent_name,
       parent_phone,
       target_grade,
-      academic_year = '2027/2028',
+      academic_year = getDefaultPPDBAcademicYear(),
       base_amount = 6900000,
       discount_type = 'Tanpa Diskon',
       discount_amount = 0,
@@ -142,8 +143,11 @@ export async function POST(request: Request) {
     const numInitial = Math.min(numTotal, Math.max(0, Number(initial_payment) || 0));
 
     // Generate unique Registration Number
-    // e.g. Year suffix: 2027/2028 -> 2728
-    const cleanYear = academic_year.replace(/\D/g, '').slice(-4) || '2728';
+    // e.g. Year suffix: 2027/2028 -> 2728, 2028/2029 -> 2829
+    const yearParts = (academic_year || '').split('/');
+    const cleanYear = yearParts.length === 2
+      ? `${yearParts[0].trim().slice(-2)}${yearParts[1].trim().slice(-2)}`
+      : (academic_year || '').replace(/\D/g, '').slice(-4) || '2728';
     
     // Count existing candidates for this academic year to create sequential code
     const { count, error: countErr } = await supabaseAdmin
