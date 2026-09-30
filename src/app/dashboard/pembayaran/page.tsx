@@ -36,6 +36,7 @@ export default function PembayaranPage() {
 
   const [masterBillsMap, setMasterBillsMap] = useState<Record<string, number>>({});
   const [selectedBillsToPay, setSelectedBillsToPay] = useState<Record<string, number>>({});
+  const [paymentMethod, setPaymentMethod] = useState<"TUNAI" | "TRANSFER">("TUNAI");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
 
@@ -184,7 +185,8 @@ export default function PembayaranPage() {
           studentId: selectedStudent.id,
           studentName: selectedStudent.name,
           bills: billsToPay,
-          userId: user?.id || null
+          userId: user?.id || null,
+          paymentMethod
         })
       });
 
@@ -199,6 +201,7 @@ export default function PembayaranPage() {
       setSearchQuery("");
       setUnpaidBills([]);
       setSelectedBillsToPay({});
+      setPaymentMethod("TUNAI");
 
       alert(`Pembayaran berhasil dicatat!\nNo. Resi: ${updateData.receiptId}`);
       
@@ -287,7 +290,7 @@ export default function PembayaranPage() {
           <div className="bg-white rounded-xl w-full max-w-2xl p-8 shadow-lg relative my-auto">
             <div className="flex justify-between items-center mb-6 border-b border-outline-variant pb-4">
               <h3 className="font-headline-md text-primary tracking-tight">Input Pembayaran Baru</h3>
-              <button onClick={() => { setIsModalOpen(false); setSelectedStudent(null); setSearchQuery(""); }} className="text-on-surface-variant hover:text-error transition-all">
+              <button onClick={() => { setIsModalOpen(false); setSelectedStudent(null); setSearchQuery(""); setPaymentMethod("TUNAI"); }} className="text-on-surface-variant hover:text-error transition-all">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -408,6 +411,39 @@ export default function PembayaranPage() {
                 <div className="pt-2 flex justify-between items-center border-t border-outline-variant mt-2">
                   <span className="font-bold text-primary">TOTAL BAYAR</span>
                   <span className="font-headline-md text-headline-md text-secondary">Rp {calculateTotal().toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              {/* Pilihan Metode Pembayaran: TUNAI vs TRANSFER */}
+              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-2">
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  Metode Pembayaran *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("TUNAI")}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-sm transition-all ${
+                      paymentMethod === "TUNAI"
+                        ? "bg-green-50 border-green-500 text-green-800 ring-2 ring-green-500/20 shadow-sm"
+                        : "bg-white border-outline-variant text-on-surface hover:bg-surface-container"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">payments</span>
+                    TUNAI (Kasir)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("TRANSFER")}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-sm transition-all ${
+                      paymentMethod === "TRANSFER"
+                        ? "bg-blue-50 border-blue-500 text-blue-800 ring-2 ring-blue-500/20 shadow-sm"
+                        : "bg-white border-outline-variant text-on-surface hover:bg-surface-container"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">account_balance</span>
+                    TRANSFER BANK
+                  </button>
                 </div>
               </div>
 

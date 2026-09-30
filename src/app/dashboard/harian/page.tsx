@@ -103,11 +103,15 @@ export default function HarianPage() {
     }
   };
 
-  // Distinct admins for dropdown
+  // Distinct admins for dropdown (exclude generic 'admin' and 'kasir toko')
   const availableAdmins = useMemo(() => {
     const admins = new Set<string>();
     transactions.forEach((t) => {
-      if (t.admin_name) admins.add(t.admin_name);
+      const name = (t.admin_name || "").trim();
+      const lower = name.toLowerCase();
+      if (name && lower !== "admin" && lower !== "kasir toko") {
+        admins.add(name);
+      }
     });
     return Array.from(admins).sort();
   }, [transactions]);
@@ -148,7 +152,7 @@ export default function HarianPage() {
 
         // 4. Jenjang Filter
         if (selectedGrade !== "all") {
-          if (trx.grade_level !== selectedGrade) return false;
+          if ((trx.grade_level || "").toUpperCase() !== selectedGrade.toUpperCase()) return false;
         }
 
         // 5. Payment Method Filter
@@ -393,72 +397,135 @@ export default function HarianPage() {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Kas Masuk Keseluruhan */}
-        <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Total Kas Masuk Terpadu</p>
-            <p className="text-2xl font-bold text-emerald-700 mt-1">
-              {isLoading ? "..." : `Rp ${totalNominal.toLocaleString("id-ID")}`}
-            </p>
-            <p className="text-xs text-on-surface-variant mt-1">
-              Tunai: <span className="font-bold text-green-700">Rp {cashSum.toLocaleString("id-ID")}</span> | TF:{" "}
-              <span className="font-bold text-blue-700">Rp {transferSum.toLocaleString("id-ID")}</span>
-            </p>
+      {userRole === "pimpinan" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Kas Masuk Keseluruhan */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Total Kas Masuk Terpadu</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">
+                {isLoading ? "..." : `Rp ${totalNominal.toLocaleString("id-ID")}`}
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Tunai: <span className="font-bold text-green-700">Rp {cashSum.toLocaleString("id-ID")}</span> | TF:{" "}
+                <span className="font-bold text-blue-700">Rp {transferSum.toLocaleString("id-ID")}</span>
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">point_of_sale</span>
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-2xl">point_of_sale</span>
-          </div>
-        </div>
 
-        {/* SPP & Tagihan Siswa */}
-        <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Penerimaan SPP &amp; Tagihan</p>
-            <p className="text-2xl font-bold text-blue-700 mt-1">
-              {isLoading ? "..." : `Rp ${sppSum.toLocaleString("id-ID")}`}
-            </p>
-            <p className="text-xs text-on-surface-variant mt-1">
-              {filteredTransactions.filter((t) => t.sourceType === "SPP").length} transaksi
-            </p>
+          {/* SPP & Tagihan Siswa */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Penerimaan SPP &amp; Tagihan</p>
+              <p className="text-2xl font-bold text-blue-700 mt-1">
+                {isLoading ? "..." : `Rp ${sppSum.toLocaleString("id-ID")}`}
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                {filteredTransactions.filter((t) => t.sourceType === "SPP").length} transaksi
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">payments</span>
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-2xl">payments</span>
-          </div>
-        </div>
 
-        {/* Uang Masuk PSB */}
-        <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Cicilan Uang Masuk (PSB)</p>
-            <p className="text-2xl font-bold text-amber-700 mt-1">
-              {isLoading ? "..." : `Rp ${psbSum.toLocaleString("id-ID")}`}
-            </p>
-            <p className="text-xs text-on-surface-variant mt-1">
-              {filteredTransactions.filter((t) => t.sourceType === "PSB").length} transaksi
-            </p>
+          {/* Uang Masuk PSB */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Cicilan Uang Masuk (PSB)</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">
+                {isLoading ? "..." : `Rp ${psbSum.toLocaleString("id-ID")}`}
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                {filteredTransactions.filter((t) => t.sourceType === "PSB").length} transaksi
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">how_to_reg</span>
+            </div>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-2xl">how_to_reg</span>
-          </div>
-        </div>
 
-        {/* Penjualan Seragam */}
-        <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-teal-800 uppercase tracking-wider">Penjualan Seragam</p>
-            <p className="text-2xl font-bold text-teal-700 mt-1">
-              {isLoading ? "..." : `Rp ${seragamSum.toLocaleString("id-ID")}`}
-            </p>
-            <p className="text-xs text-on-surface-variant mt-1">
-              {filteredTransactions.filter((t) => t.sourceType === "SERAGAM").length} transaksi
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-2xl">checkroom</span>
+          {/* Penjualan Seragam */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-teal-800 uppercase tracking-wider">Penjualan Seragam</p>
+              <p className="text-2xl font-bold text-teal-700 mt-1">
+                {isLoading ? "..." : `Rp ${seragamSum.toLocaleString("id-ID")}`}
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                {filteredTransactions.filter((t) => t.sourceType === "SERAGAM").length} transaksi
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">checkroom</span>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Transaksi Terpadu */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Total Transaksi Kas Masuk</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">
+                {isLoading ? "..." : `${filteredTransactions.length} Transaksi`}
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Tunai: <span className="font-bold text-green-700">{filteredTransactions.filter(t => t.payment_method === "TUNAI").length} trx</span> | TF:{" "}
+                <span className="font-bold text-blue-700">{filteredTransactions.filter(t => t.payment_method === "TRANSFER").length} trx</span>
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">receipt_long</span>
+            </div>
+          </div>
+
+          {/* SPP & Tagihan Siswa */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Transaksi SPP &amp; Tagihan</p>
+              <p className="text-2xl font-bold text-blue-700 mt-1">
+                {filteredTransactions.filter((t) => t.sourceType === "SPP").length} Transaksi
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">Pembayaran SPP &amp; tagihan rutin</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">payments</span>
+            </div>
+          </div>
+
+          {/* Uang Masuk PSB */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Transaksi Cicilan PSB</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">
+                {filteredTransactions.filter((t) => t.sourceType === "PSB").length} Transaksi
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">Cicilan uang masuk siswa baru</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">how_to_reg</span>
+            </div>
+          </div>
+
+          {/* Penjualan Seragam */}
+          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-teal-800 uppercase tracking-wider">Transaksi Penjualan Seragam</p>
+              <p className="text-2xl font-bold text-teal-700 mt-1">
+                {filteredTransactions.filter((t) => t.sourceType === "SERAGAM").length} Transaksi
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">Pembelian seragam &amp; atribut</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-2xl">checkroom</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Controls */}
       <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm space-y-4">
@@ -596,6 +663,7 @@ export default function HarianPage() {
               <option value="all">Semua Jenjang</option>
               <option value="SD">SD</option>
               <option value="SMP">SMP</option>
+              <option value="SMA">SMA</option>
             </select>
           </div>
 
@@ -712,7 +780,7 @@ export default function HarianPage() {
                   WAKTU
                 </th>
                 <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-xs sticky top-0">
-                  SUMBER
+                  TINGKAT
                 </th>
                 <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-xs sticky top-0">
                   NO. RESI / KWITANSI
@@ -764,19 +832,23 @@ export default function HarianPage() {
                         <div className="font-semibold text-on-surface">{formattedDate}</div>
                       </td>
 
-                      {/* Sumber Badge */}
+                      {/* Tingkat Siswa Badge */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
-                        {trx.sourceType === "SPP" ? (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[11px] font-bold border border-blue-200">
-                            SPP
+                        {trx.grade_level?.toUpperCase() === "SD" ? (
+                          <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[11px] font-bold border border-blue-200">
+                            SD
                           </span>
-                        ) : trx.sourceType === "PSB" ? (
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[11px] font-bold border border-amber-200">
-                            PSB
+                        ) : trx.grade_level?.toUpperCase() === "SMP" ? (
+                          <span className="px-2.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[11px] font-bold border border-purple-200">
+                            SMP
+                          </span>
+                        ) : trx.grade_level?.toUpperCase() === "SMA" ? (
+                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[11px] font-bold border border-emerald-200">
+                            SMA
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-teal-100 text-teal-800 rounded text-[11px] font-bold border border-teal-200">
-                            Seragam
+                          <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[11px] font-bold border border-gray-200">
+                            {trx.grade_level || "-"}
                           </span>
                         )}
                       </td>
@@ -791,7 +863,6 @@ export default function HarianPage() {
                         <div className="flex flex-col">
                           <span className="font-bold text-sm text-on-surface">{trx.student_name}</span>
                           <span className="text-xs text-on-surface-variant">
-                            {trx.grade_level ? `${trx.grade_level} • ` : ""}
                             {trx.class_name}
                           </span>
                         </div>

@@ -27,8 +27,8 @@ export function getDefaultPPDBAcademicYear(): string {
 }
 
 /**
- * Returns a sorted list (descending) of academic years:
- * includes past 2 years, current year, next 2 years, plus any extra/existing years from DB.
+ * Returns a list of academic years up to 100 years into the future (reaching 2100/2101+):
+ * includes past 3 years, current PPDB year, and all subsequent years up to 100 years ahead.
  */
 export function getDynamicAcademicYears(extraYears: (string | null | undefined)[] = []): string[] {
   const defaultYear = getDefaultPPDBAcademicYear();
@@ -37,9 +37,11 @@ export function getDynamicAcademicYears(extraYears: (string | null | undefined)[
 
   const yearsSet = new Set<string>();
 
-  // Rolling window: 2 years back to 2 years ahead of PPDB year
-  for (let i = -2; i <= 2; i++) {
-    const y = baseYear + i;
+  // Start from 3 years in the past (e.g. 2024) up to 100 years ahead (at least 2100/2101)
+  const startFrom = Math.min(baseYear - 3, 2024);
+  const endAt = Math.max(baseYear + 100, 2100);
+
+  for (let y = startFrom; y <= endAt; y++) {
     yearsSet.add(`${y}/${y + 1}`);
   }
 
@@ -50,6 +52,6 @@ export function getDynamicAcademicYears(extraYears: (string | null | undefined)[
     }
   }
 
-  // Sort descending: e.g. "2029/2030", "2028/2029", "2027/2028", ...
-  return Array.from(yearsSet).sort().reverse();
+  // Sort ascending: e.g. "2024/2025", "2025/2026", "2026/2027", "2027/2028", ... "2100/2101"
+  return Array.from(yearsSet).sort((a, b) => a.localeCompare(b));
 }

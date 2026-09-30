@@ -9,7 +9,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { studentId, studentName, bills, userId } = body;
+    const { studentId, studentName, bills, userId, paymentMethod = 'TUNAI' } = body;
 
     if (!studentId || !bills || !Array.isArray(bills) || bills.length === 0) {
       return NextResponse.json(
@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       p_student_id: studentId,
       p_bills: bills,
       p_admin_id: userId || null,
-      p_receipt_id: receiptId
+      p_receipt_id: receiptId,
+      p_payment_method: paymentMethod || 'TUNAI'
     });
 
     if (rpcError) {
