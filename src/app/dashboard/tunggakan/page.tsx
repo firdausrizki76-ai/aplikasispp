@@ -1021,7 +1021,15 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
+              {userRole === 'pimpinan' && (
+                <div className="text-right hidden sm:block">
+                  <div className="text-xs text-amber-800 opacity-75">Total Tagihan Tertunggak</div>
+                  <div className="font-bold text-lg text-amber-900">
+                    Rp {otherArrearsData.reduce((acc, d) => acc + d.totalNonSpp, 0).toLocaleString('id-ID')}
+                  </div>
+                </div>
+              )}
               <button
                 onClick={handleCopyOtherList}
                 className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
@@ -1031,6 +1039,54 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
               </button>
             </div>
           </div>
+
+          {/* Summary Metric Cards for Pimpinan */}
+          {userRole === 'pimpinan' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Siswa Tertunggak</p>
+                  <h4 className="text-2xl font-bold text-on-surface mt-1">{otherArrearsData.length} Siswa</h4>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    {selectedOtherBillType === 'ALL' ? 'Semua Non-SPP' : selectedOtherBillType}
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined">groups</span>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Item Tagihan Belum Lunas</p>
+                  <h4 className="text-2xl font-bold text-amber-800 mt-1">
+                    {otherArrearsData.reduce((acc, d) => acc + d.nonSppBills.length, 0)} Tagihan
+                  </h4>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Periode: {selectedOtherMonth === 'ALL' ? 'Semua Periode' : selectedOtherMonth}
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-xl bg-orange-50 text-orange-700 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined">receipt_long</span>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase font-bold text-error tracking-wider">Total Nominal Tunggakan</p>
+                  <h4 className="text-2xl font-bold text-error mt-1">
+                    Rp {otherArrearsData.reduce((acc, d) => acc + d.totalNonSpp, 0).toLocaleString('id-ID')}
+                  </h4>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Khusus Akses Pimpinan
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-xl bg-red-50 text-error flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined">account_balance_wallet</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Filter Bar for Tab Lainnya */}
           <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-sm mb-6 flex flex-col md:flex-row gap-3 items-center justify-between">

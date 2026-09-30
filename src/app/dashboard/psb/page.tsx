@@ -146,6 +146,25 @@ export default function PSBPage() {
     installment: Installment;
   } | null>(null);
 
+  // Modal 5: Edit Candidate
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editCandidateId, setEditCandidateId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: "",
+    gender: "L" as "L" | "P",
+    pob: "",
+    dob: "",
+    parent_name: "",
+    parent_phone: "",
+    target_grade: "SD" as "SD" | "SMP",
+    academic_year: defaultAcademicYear,
+    base_amount: 6900000,
+    discount_type: "Tanpa Diskon",
+    discount_amount: 0,
+    discount_notes: "",
+  });
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     const initUser = async () => {
@@ -507,6 +526,70 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
     }
   };
 
+  // Open Edit Modal
+  const openEditModal = (c: PSBCandidate) => {
+    setEditCandidateId(c.id);
+    setEditForm({
+      full_name: c.full_name,
+      gender: c.gender || "L",
+      pob: c.pob || "",
+      dob: c.dob || "",
+      parent_name: c.parent_name || "",
+      parent_phone: c.parent_phone || "",
+      target_grade: c.target_grade,
+      academic_year: c.academic_year || defaultAcademicYear,
+      base_amount: Number(c.base_amount) || 0,
+      discount_type: c.discount_type || "Tanpa Diskon",
+      discount_amount: Number(c.discount_amount) || 0,
+      discount_notes: c.discount_notes || "",
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditDiscountTypeChange = (type: string) => {
+    const preset = DISCOUNT_PRESETS.find((p) => p.label === type);
+    setEditForm((prev) => ({
+      ...prev,
+      discount_type: type,
+      discount_amount: preset ? preset.amount : prev.discount_amount,
+    }));
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCandidateId) return;
+    if (!editForm.full_name.trim()) {
+      alert("Nama calon siswa wajib diisi!");
+      return;
+    }
+    setSubmittingEdit(true);
+    try {
+      const res = await fetch("/api/psb/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateId: editCandidateId,
+          ...editForm,
+          userId,
+        }),
+      });
+
+      const resData = await res.json();
+      if (res.ok && resData.success) {
+        alert("Data calon siswa berhasil diperbarui!");
+        setIsEditModalOpen(false);
+        setEditCandidateId(null);
+        fetchCandidates();
+      } else {
+        alert("Gagal memperbarui data: " + (resData.error || ""));
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
   return (
     <>
       <div className="view-section space-y-6">
@@ -536,67 +619,115 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
         </div>
 
         {/* Summary Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Total Calon Siswa</p>
-              <h3 className="text-2xl font-bold text-on-surface mt-1">{summary.totalCandidates} Siswa</h3>
-              <p className="text-xs text-on-surface-variant mt-1">
-                Lunas: <span className="text-green-600 font-bold">{summary.countLunas}</span> | Masuk Kelas:{" "}
-                <span className="text-blue-600 font-bold">{summary.countTerdaftarKelas}</span>
-              </p>
+        {userRole === "pimpinan" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Total Calon Siswa</p>
+                <h3 className="text-2xl font-bold text-on-surface mt-1">{summary.totalCandidates} Siswa</h3>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  Lunas: <span className="text-green-600 font-bold">{summary.countLunas}</span> | Masuk Kelas:{" "}
+                  <span className="text-blue-600 font-bold">{summary.countTerdaftarKelas}</span>
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">groups</span>
+              </div>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined">groups</span>
-            </div>
-          </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Target Uang Masuk (Nett)</p>
-              <h3 className="text-2xl font-bold text-primary mt-1">
-                Rp {summary.totalTarget.toLocaleString("id-ID")}
-              </h3>
-              <p className="text-xs text-on-surface-variant mt-1">Setelah dikurangi diskon</p>
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Target Uang Masuk (Nett)</p>
+                <h3 className="text-2xl font-bold text-primary mt-1">
+                  Rp {summary.totalTarget.toLocaleString("id-ID")}
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-1">Setelah dikurangi diskon</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">calculate</span>
+              </div>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined">calculate</span>
-            </div>
-          </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase font-bold text-green-700 tracking-wider">Uang Masuk Diterima</p>
-              <h3 className="text-2xl font-bold text-green-700 mt-1">
-                Rp {summary.totalPaid.toLocaleString("id-ID")}
-              </h3>
-              <p className="text-xs text-green-600 mt-1">
-                Tercapai:{" "}
-                <span className="font-bold">
-                  {summary.totalTarget > 0 ? Math.round((summary.totalPaid / summary.totalTarget) * 100) : 0}%
-                </span>
-              </p>
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-green-700 tracking-wider">Uang Masuk Diterima</p>
+                <h3 className="text-2xl font-bold text-green-700 mt-1">
+                  Rp {summary.totalPaid.toLocaleString("id-ID")}
+                </h3>
+                <p className="text-xs text-green-600 mt-1">
+                  Tercapai:{" "}
+                  <span className="font-bold">
+                    {summary.totalTarget > 0 ? Math.round((summary.totalPaid / summary.totalTarget) * 100) : 0}%
+                  </span>
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">account_balance_wallet</span>
+              </div>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined">account_balance_wallet</span>
-            </div>
-          </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase font-bold text-amber-700 tracking-wider">Sisa Tunggakan Cicilan</p>
-              <h3 className="text-2xl font-bold text-amber-700 mt-1">
-                Rp {summary.totalRemaining.toLocaleString("id-ID")}
-              </h3>
-              <p className="text-xs text-amber-600 mt-1">
-                Sedang Mencicil: <span className="font-bold">{summary.countMencicil}</span> siswa
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined">pending_actions</span>
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-amber-700 tracking-wider">Sisa Tunggakan Cicilan</p>
+                <h3 className="text-2xl font-bold text-amber-700 mt-1">
+                  Rp {summary.totalRemaining.toLocaleString("id-ID")}
+                </h3>
+                <p className="text-xs text-amber-600 mt-1">
+                  Sedang Mencicil: <span className="font-bold">{summary.countMencicil}</span> siswa
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">pending_actions</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Total Calon Siswa</p>
+                <h3 className="text-2xl font-bold text-on-surface mt-1">{summary.totalCandidates} Siswa</h3>
+                <p className="text-xs text-on-surface-variant mt-1">Terdaftar di sistem PPDB</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">groups</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-green-700 tracking-wider">Status Lunas</p>
+                <h3 className="text-2xl font-bold text-green-700 mt-1">{summary.countLunas} Siswa</h3>
+                <p className="text-xs text-green-600 mt-1">Kewajiban uang masuk lunas</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">check_circle</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-amber-700 tracking-wider">Sedang Mencicil</p>
+                <h3 className="text-2xl font-bold text-amber-700 mt-1">{summary.countMencicil} Siswa</h3>
+                <p className="text-xs text-amber-600 mt-1">Dalam proses angsuran</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">hourglass_top</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase font-bold text-red-700 tracking-wider">Belum Membayar</p>
+                <h3 className="text-2xl font-bold text-red-700 mt-1">{summary.countBelumBayar} Siswa</h3>
+                <p className="text-xs text-red-600 mt-1">Belum ada cicilan awal</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-red-50 text-red-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">schedule</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filter & Search Bar */}
         <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
@@ -888,15 +1019,25 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
                               </button>
                             ) : null}
 
-                            {/* Delete Candidate */}
-                            <button
-                              onClick={() => handleDeleteCandidate(c)}
-                              className="text-error hover:bg-red-50 p-1 rounded text-xs transition-colors flex items-center gap-1 mt-1 opacity-60 hover:opacity-100"
-                              title="Hapus Calon Siswa"
-                            >
-                              <span className="material-symbols-outlined text-[15px]">delete</span>
-                              Hapus
-                            </button>
+                            {/* Edit & Delete Candidate */}
+                            <div className="flex items-center justify-center gap-1.5 mt-1 w-full">
+                              <button
+                                onClick={() => openEditModal(c)}
+                                className="flex-1 text-primary hover:bg-primary/10 border border-primary/30 px-2 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1"
+                                title="Edit Data Calon Siswa"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCandidate(c)}
+                                className="flex-1 text-error hover:bg-red-50 border border-error/30 px-2 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 opacity-80 hover:opacity-100"
+                                title="Hapus Calon Siswa"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                                Hapus
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -1652,6 +1793,257 @@ Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau transfer reke
                 </div>
               </div>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: EDIT DATA CALON SISWA                                             */}
+      {/* ========================================================================= */}
+      {mounted && isEditModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 overflow-y-auto p-4 py-8">
+          <div className="bg-white rounded-2xl w-full max-w-2xl p-6 md:p-8 shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5 border-b border-outline-variant pb-4">
+              <div>
+                <h3 className="font-headline-md text-primary font-bold text-xl">Edit Data Calon Siswa</h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Perbarui profil, jenjang, atau rincian skema biaya uang masuk calon siswa
+                </p>
+              </div>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-on-surface-variant hover:text-error p-1 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              {/* Row 1: Nama, Jenjang & Tahun Ajaran */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div className="md:col-span-6">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Nama Lengkap Calon Siswa *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.full_name}
+                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium"
+                    placeholder="Contoh: Muhammad Rayhan"
+                  />
+                </div>
+
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Jenjang Sekolah *
+                  </label>
+                  <select
+                    value={editForm.target_grade}
+                    onChange={(e) => setEditForm({ ...editForm, target_grade: e.target.value as "SD" | "SMP" })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold"
+                  >
+                    <option value="SD">SD Taruna Islam</option>
+                    <option value="SMP">SMP Taruna Islam</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Tahun Ajaran *
+                  </label>
+                  <select
+                    value={editForm.academic_year}
+                    onChange={(e) => setEditForm({ ...editForm, academic_year: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-bold bg-white"
+                  >
+                    {academicYearOptions.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Jenis Kelamin & Tempat/Tanggal Lahir */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Jenis Kelamin
+                  </label>
+                  <select
+                    value={editForm.gender}
+                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value as "L" | "P" })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm outline-none"
+                  >
+                    <option value="L">Laki-laki (L)</option>
+                    <option value="P">Perempuan (P)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Tempat Lahir
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.pob}
+                    onChange={(e) => setEditForm({ ...editForm, pob: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm outline-none"
+                    placeholder="Pekanbaru"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Tanggal Lahir
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.dob}
+                    onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Nama Ortu & No WhatsApp */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    Nama Orang Tua / Wali
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.parent_name}
+                    onChange={(e) => setEditForm({ ...editForm, parent_name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm outline-none"
+                    placeholder="Nama Ayah/Bunda"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                    No. WhatsApp Orang Tua *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.parent_phone}
+                    onChange={(e) => setEditForm({ ...editForm, parent_phone: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-outline-variant rounded-xl text-sm outline-none"
+                    placeholder="Contoh: 081234567890"
+                  />
+                </div>
+              </div>
+
+              {/* Skema Uang Masuk & Kalkulator Diskon */}
+              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-3">
+                <div className="flex items-center justify-between border-b border-outline-variant pb-2">
+                  <span className="font-bold text-primary text-sm flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px]">percent</span>
+                    Skema Biaya &amp; Kalkulator Diskon
+                  </span>
+                  <span className="text-xs text-on-surface-variant">T.A. {editForm.academic_year}</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                      Biaya Dasar Uang Masuk (Normal)
+                    </label>
+                    <input
+                      type="number"
+                      value={editForm.base_amount}
+                      onChange={(e) => setEditForm({ ...editForm, base_amount: Number(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-sm font-semibold outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                      Kategori Potongan / Diskon
+                    </label>
+                    <select
+                      value={editForm.discount_type}
+                      onChange={(e) => handleEditDiscountTypeChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-sm font-medium outline-none"
+                    >
+                      {DISCOUNT_PRESETS.map((d) => (
+                        <option key={d.label} value={d.label}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                      Nominal Potongan / Diskon (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      value={editForm.discount_amount}
+                      onChange={(e) => setEditForm({ ...editForm, discount_amount: Number(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-sm font-semibold outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                      Catatan Diskon (Opsional / Pimpinan)
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.discount_notes}
+                      onChange={(e) => setEditForm({ ...editForm, discount_notes: e.target.value })}
+                      placeholder="Contoh: Diskon persetujuan Ustadz..."
+                      className="w-full px-3 py-2 border border-outline-variant rounded-lg text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Net Total Preview */}
+                <div className="p-3 bg-white rounded-lg border border-primary/20 flex justify-between items-center">
+                  <span className="text-xs font-bold text-on-surface-variant">TOTAL BIAYA PSB (SETELAH DISKON):</span>
+                  <span className="text-lg font-bold text-primary">
+                    Rp {Math.max(0, editForm.base_amount - editForm.discount_amount).toLocaleString("id-ID")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-5 py-2.5 border border-outline-variant text-on-surface font-semibold text-sm rounded-xl hover:bg-surface-container"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingEdit}
+                  className="px-6 py-2.5 bg-primary hover:bg-primary-container text-on-primary font-bold text-sm rounded-xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {submittingEdit ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">save</span>
+                      Simpan Perubahan
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body
