@@ -3,7 +3,7 @@
 import { createClient } from "@/utils/supabase/client";
 import { clearTunggakanCache, setTunggakanCache, tunggakanCache } from "@/utils/tunggakanCache";
 import { formatWhatsAppNumber } from "@/utils/phone";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Database } from "@/utils/supabase/database.types";
 
@@ -17,6 +17,11 @@ interface ArrearsSummary {
   totalArrears: number; // Sum of nominal
   totalOriginalArrears: number; // Sum of original default nominals (for discount strike-through)
   bills: any[]; // Store bills for details
+}
+
+interface OtherArrearsItem extends ArrearsSummary {
+  nonSppBills: any[];
+  totalNonSpp: number;
 }
 
 export default function TunggakanPage() {
@@ -44,8 +49,10 @@ export default function TunggakanPage() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
   // Tabs & Monthly Notification State
-  const [activeTab, setActiveTab] = useState<'semua' | 'bulanan'>('semua');
+  const [activeTab, setActiveTab] = useState<'semua' | 'bulanan' | 'lainnya'>('semua');
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedOtherBillType, setSelectedOtherBillType] = useState<string>("ALL");
+  const [selectedOtherMonth, setSelectedOtherMonth] = useState<string>("ALL");
 
   useEffect(() => {
     const monthsStr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -494,6 +501,124 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
     alert("✅ Daftar siswa belum bayar SPP berhasil disalin ke clipboard!");
   };
 
+  // Extract distinct other (non-SPP) bill types and months
+  const availableOtherBillTypes = useMemo(() => {
+    const types = new Set<string>();
+    arrearsData.forEach(s => {
+      s.bills?.forEach(b => {
+        const name = (b.jenis_tagihan || "").trim();
+        if (name && !name.toLowerCase().startsWith("spp")) {
+          types.add(name);
+        }
+      });
+    });
+    return Array.from(types).sort();
+  }, [arrearsData]);
+
+  const availableOtherMonths = useMemo(() => {
+    const months = new Set<string>();
+    arrearsData.forEach(s => {
+      s.bills?.forEach(b => {
+        const name = (b.jenis_tagihan || "").trim();
+        if (name && !name.toLowerCase().startsWith("spp") && b.bulan_tagihan) {
+          months.add(b.bulan_tagihan.trim());
+        }
+      });
+    });
+    return Array.from(months).sort();
+  }, [arrearsData]);
+
+  const otherArrearsData: OtherArrearsItem[] = useMemo(() => {
+    return arrearsData
+      .map((summary: ArrearsSummary): OtherArrearsItem | null => {
+        const nonSppBills = (summary.bills || []).filter((b: any) => {
+          const isNonSpp = !(b.jenis_tagihan || "").toLowerCase().startsWith("spp");
+          if (!isNonSpp) return false;
+          if (selectedOtherBillType !== "ALL" && b.jenis_tagihan !== selectedOtherBillType) return false;
+          if (selectedOtherMonth !== "ALL" && b.bulan_tagihan !== selectedOtherMonth) return false;
+          return true;
+        });
+        if (nonSppBills.length === 0) return null;
+        const totalNonSpp = nonSppBills.reduce((sum: number, b: any) => sum + Number(b.nominal || 0), 0);
+        return {
+          ...summary,
+          nonSppBills,
+          totalNonSpp,
+        };
+      })
+      .filter((item): item is OtherArrearsItem => item !== null)
+      .filter((d: OtherArrearsItem) => {
+        if (filterJenjang && d.student.grade_level !== filterJenjang) return false;
+        const className = d.student.classes?.class_name || (d.student as any).class_name || "";
+        if (filterKelas && className !== filterKelas) return false;
+        if (searchQuery && !d.student.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        return true;
+      })
+      .sort((a: OtherArrearsItem, b: OtherArrearsItem) => {
+        const classA = a.student.classes?.class_name || (a.student as any).class_name || "";
+        const classB = b.student.classes?.class_name || (b.student as any).class_name || "";
+        if (classA !== classB) return classA.localeCompare(classB);
+        return a.student.name.localeCompare(b.student.name);
+      });
+  }, [arrearsData, selectedOtherBillType, selectedOtherMonth, filterJenjang, filterKelas, searchQuery]);
+
+  const handleCopyOtherList = () => {
+    if (otherArrearsData.length === 0) {
+      alert("Tidak ada siswa yang tertunggak pada kategori tagihan ini.");
+      return;
+    }
+    const billTypeLabel = selectedOtherBillType === 'ALL' ? 'Tagihan Non-SPP (Ekskul, UTS, UAS, dll)' : selectedOtherBillType;
+    const monthLabel = selectedOtherMonth === 'ALL' ? '' : ` Periode ${selectedOtherMonth}`;
+    const headerText = `*Daftar Siswa Tertunggak ${billTypeLabel}${monthLabel}*\nTanggal: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`;
+    const listText = otherArrearsData.map((d: OtherArrearsItem, i: number) => {
+      const cls = d.student.classes?.class_name || (d.student as any).class_name || "-";
+      return `${i + 1}. *${d.student.name}* (Kelas ${cls}) - Rp ${d.totalNonSpp.toLocaleString('id-ID')}`;
+    }).join('\n');
+    const totalAmount = otherArrearsData.reduce((acc: number, d: OtherArrearsItem) => acc + d.totalNonSpp, 0).toLocaleString('id-ID');
+    const totalText = userRole === 'pimpinan'
+      ? `\n\n*Total: ${otherArrearsData.length} Siswa (Rp ${totalAmount})*`
+      : `\n\n*Total: ${otherArrearsData.length} Siswa*`;
+    
+    navigator.clipboard.writeText(headerText + listText + totalText);
+    alert("✅ Daftar siswa tertunggak berhasil disalin ke clipboard!");
+  };
+
+  const handleSendOtherWA = (d: OtherArrearsItem) => {
+    const rawPhone = d.student.parent_phone;
+    const phone = formatWhatsAppNumber(rawPhone);
+    if (!phone) {
+      alert("Nomor WhatsApp orang tua tidak tersedia untuk siswa ini.");
+      return;
+    }
+    const rincian = d.nonSppBills.map((b: any) => `- ${b.jenis_tagihan} ${b.bulan_tagihan ? `(${b.bulan_tagihan})` : ''}: Rp ${Number(b.nominal).toLocaleString('id-ID')}`).join('\n');
+    const total = d.totalNonSpp.toLocaleString('id-ID');
+    const className = d.student.classes?.class_name || (d.student as any).class_name || '-';
+    
+    const text = `*PEMBERITAHUAN TUNGGAKAN KEGIATAN & ADMINISTRASI SEKOLAH*
+*SD-SMP TARUNA ISLAM PEKANBARU*
+----------------------------------------
+Nama Siswa : *${d.student.name}*
+Kelas      : *${className}*
+Jenjang    : *${d.student.grade_level}*
+
+*RINCIAN TAGIHAN BELUM LUNAS:*
+${rincian}
+
+*TOTAL KEWAJIBAN: Rp ${total}*
+----------------------------------------
+Assalamu'alaikum Warahmatullahi Wabarakatuh.
+Yth. Ayah/Bunda dari ananda *${d.student.name}*, kami menginformasikan perihal kewajiban tagihan sekolah di atas yang saat ini tercatat belum diselesaikan di sistem administrasi kami.
+
+Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau melalui transfer ke rekening resmi yayasan. Apabila Ayah/Bunda telah melakukan pembayaran, mohon berkenan mengirimkan bukti transfer/resi untuk kami lakukan verifikasi data.
+
+Terima kasih atas kerja sama dan perhatian Ayah/Bunda.
+
+_Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
+
+    const waUrl = `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank");
+  };
+
   const today = new Date();
   const isReminderPeriod = today.getDate() >= 20;
 
@@ -503,7 +628,7 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
         <div>
           <h2 className="font-headline-lg text-headline-lg text-error tracking-tight">Laporan Tunggakan</h2>
           <p className="font-body-lg text-body-lg text-on-surface-variant mt-1">
-            Daftar siswa yang belum melunasi kewajiban pembayaran SPP sesuai bulan berjalan.
+            Daftar siswa yang belum melunasi kewajiban SPP bulanan maupun tagihan kegiatan/administrasi lainnya.
           </p>
         </div>
       </div>
@@ -533,6 +658,20 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
           Pemberitahuan SPP Bulanan (Tgl 20+)
           <span className="bg-error-container text-on-error-container text-xs px-2 py-0.5 rounded-full font-bold ml-1">
             {monthlyArrearsData.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('lainnya')}
+          className={`pb-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'lainnya'
+              ? 'border-error text-error'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">category</span>
+          Tunggakan Lainnya (Non-SPP)
+          <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold ml-1">
+            {otherArrearsData.length}
           </span>
         </button>
       </div>
@@ -666,7 +805,7 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
             </div>
           </div>
         </>
-      ) : (
+      ) : activeTab === 'bulanan' ? (
         <>
           {/* Monthly Reminder Info Banner */}
           <div className={`p-5 rounded-xl mb-6 border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
@@ -842,6 +981,193 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
                         </div>
                         <p className="font-bold text-lg text-on-surface">Semua Lunas!</p>
                         <p className="text-sm">Tidak ada siswa yang menunggak SPP pada bulan {selectedMonth}.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Tab 3: Tunggakan Lainnya (Non-SPP) */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6 text-amber-950 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-2xl mt-0.5 text-amber-700">category</span>
+              <div>
+                <div className="font-bold text-base flex items-center gap-2 flex-wrap">
+                  Tunggakan Kegiatan &amp; Administrasi Sekolah
+                  <span className="bg-amber-600 text-white text-xs px-2.5 py-0.5 rounded-full font-bold">
+                    Non-SPP
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 mt-1">
+                  Tagihan khusus seperti Ekskul, Ujian (UTS/UAS), Rapor &amp; Foto Siswa Baru, Administrasi Akhir, dan kegiatan lainnya.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <button
+                onClick={handleCopyOtherList}
+                className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                Salin Daftar Siswa ({otherArrearsData.length})
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar for Tab Lainnya */}
+          <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-sm mb-6 flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              {/* Jenis Tagihan */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-on-surface-variant uppercase">Jenis Tagihan:</span>
+                <select
+                  value={selectedOtherBillType}
+                  onChange={(e) => setSelectedOtherBillType(e.target.value)}
+                  className="border border-outline-variant rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus:ring-1 focus:ring-primary bg-surface"
+                >
+                  <option value="ALL">Semua Jenis Tagihan</option>
+                  {availableOtherBillTypes.map((t: string) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Bulan / Periode */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-on-surface-variant uppercase">Periode:</span>
+                <select
+                  value={selectedOtherMonth}
+                  onChange={(e) => setSelectedOtherMonth(e.target.value)}
+                  className="border border-outline-variant rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus:ring-1 focus:ring-primary bg-surface"
+                >
+                  <option value="ALL">Semua Periode</option>
+                  {availableOtherMonths.map((m: string) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Jenjang */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-on-surface-variant uppercase">Jenjang:</span>
+                <select
+                  value={filterJenjang}
+                  onChange={(e) => setFilterJenjang(e.target.value)}
+                  className="border border-outline-variant rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary bg-surface"
+                >
+                  <option value="">Semua</option>
+                  <option value="SD">SD</option>
+                  <option value="SMP">SMP</option>
+                </select>
+              </div>
+
+              {/* Kelas */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-on-surface-variant uppercase">Kelas:</span>
+                <select
+                  value={filterKelas}
+                  onChange={(e) => setFilterKelas(e.target.value)}
+                  className="border border-outline-variant rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary bg-surface"
+                >
+                  <option value="">Semua</option>
+                  {availableClasses.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full md:w-64">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Cari nama siswa..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 border border-outline-variant rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary bg-surface"
+              />
+            </div>
+          </div>
+
+          {/* Table for Tab Lainnya */}
+          <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead className="bg-surface-container-low border-b border-outline-variant">
+                  <tr>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Jenjang</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Nama Siswa</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Kelas</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Rincian Tagihan Tertunggak</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Total Tagihan Terpilih</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Total Seluruh Tunggakan</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">No. WhatsApp</th>
+                    <th className="px-6 py-4 font-bold text-on-surface-variant uppercase tracking-wider text-xs">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant text-on-surface">
+                  {otherArrearsData.length > 0 ? (
+                    otherArrearsData.map((d: OtherArrearsItem) => (
+                      <tr key={d.student.id} className="hover:bg-surface-container-low/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${d.student.grade_level === 'SD' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                            {d.student.grade_level}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-on-surface">{d.student.name}</td>
+                        <td className="px-6 py-4">{d.student.classes?.class_name || (d.student as any).class_name || '-'}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {d.nonSppBills.map((b: any) => (
+                              <span key={b.id} className="inline-block bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-semibold">
+                                {b.jenis_tagihan} {b.bulan_tagihan ? `(${b.bulan_tagihan})` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-amber-800">
+                          Rp {d.totalNonSpp.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => setSelectedStudent(d)}
+                            className="text-error font-bold flex items-center gap-1 hover:underline transition-colors"
+                            title="Klik untuk rincian semua tagihan"
+                          >
+                            Rp {d.totalArrears.toLocaleString('id-ID')} ({d.totalUnpaidBills} tagihan)
+                            <span className="material-symbols-outlined text-[15px]">info</span>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 font-data-mono text-sm">
+                          {d.student.parent_phone || '-'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleSendOtherWA(d)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded flex items-center gap-1 text-xs font-bold transition-all shadow-sm"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">chat</span>
+                            Hubungi (WA)
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="p-12 text-center text-on-surface-variant flex flex-col items-center justify-center gap-3">
+                        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-3xl text-green-600">done_all</span>
+                        </div>
+                        <p className="font-bold text-lg text-on-surface">Tidak Ada Tunggakan!</p>
+                        <p className="text-sm">Tidak ditemukan siswa yang menunggak pada filter jenis tagihan ini.</p>
                       </td>
                     </tr>
                   )}
