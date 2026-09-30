@@ -8,6 +8,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: 'dashboard' },
+    { name: 'PSB / Uang Masuk', href: '/dashboard/psb', icon: 'person_add' },
     { name: 'Pembayaran', href: '/dashboard/pembayaran', icon: 'payments' },
     { name: 'Tunggakan', href: '/dashboard/tunggakan', icon: 'assignment_late' },
     { name: 'Transaksi Harian', href: '/dashboard/harian', icon: 'receipt_long' },

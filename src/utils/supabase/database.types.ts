@@ -87,7 +87,15 @@ export type Database = {
           table_name?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_audit_logs_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       classes: {
         Row: {
@@ -239,24 +247,157 @@ export type Database = {
       }
       profiles: {
         Row: {
+          email: string | null
           full_name: string | null
           id: string
           role: Database["public"]["Enums"]["role_type"]
           status: Database["public"]["Enums"]["status_type"]
         }
         Insert: {
+          email?: string | null
           full_name?: string | null
           id: string
           role?: Database["public"]["Enums"]["role_type"]
           status?: Database["public"]["Enums"]["status_type"]
         }
         Update: {
+          email?: string | null
           full_name?: string | null
           id?: string
           role?: Database["public"]["Enums"]["role_type"]
           status?: Database["public"]["Enums"]["status_type"]
         }
         Relationships: []
+      }
+      psb_candidates: {
+        Row: {
+          academic_year: string
+          base_amount: number
+          created_at: string
+          created_by: string | null
+          discount_amount: number
+          discount_notes: string | null
+          discount_type: string | null
+          dob: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          parent_name: string | null
+          parent_phone: string | null
+          pob: string | null
+          registration_no: string
+          remaining_balance: number
+          status: string
+          synced_student_id: string | null
+          target_grade: string
+          total_amount: number
+          total_paid: number
+          updated_at: string
+        }
+        Insert: {
+          academic_year?: string
+          base_amount?: number
+          created_at?: string
+          created_by?: string | null
+          discount_amount?: number
+          discount_notes?: string | null
+          discount_type?: string | null
+          dob?: string | null
+          full_name: string
+          gender?: string | null
+          id?: string
+          parent_name?: string | null
+          parent_phone?: string | null
+          pob?: string | null
+          registration_no: string
+          remaining_balance?: number
+          status?: string
+          synced_student_id?: string | null
+          target_grade: string
+          total_amount?: number
+          total_paid?: number
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string
+          base_amount?: number
+          created_at?: string
+          created_by?: string | null
+          discount_amount?: number
+          discount_notes?: string | null
+          discount_type?: string | null
+          dob?: string | null
+          full_name?: string
+          gender?: string | null
+          id?: string
+          parent_name?: string | null
+          parent_phone?: string | null
+          pob?: string | null
+          registration_no?: string
+          remaining_balance?: number
+          status?: string
+          synced_student_id?: string | null
+          target_grade?: string
+          total_amount?: number
+          total_paid?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "psb_candidates_synced_student_id_fkey"
+            columns: ["synced_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      psb_installments: {
+        Row: {
+          amount: number
+          candidate_id: string
+          created_at: string
+          id: string
+          installment_step: number
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          receipt_no: string
+          received_by: string | null
+        }
+        Insert: {
+          amount: number
+          candidate_id: string
+          created_at?: string
+          id?: string
+          installment_step?: number
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          receipt_no: string
+          received_by?: string | null
+        }
+        Update: {
+          amount?: number
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          installment_step?: number
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          receipt_no?: string
+          received_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "psb_installments_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "psb_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       psb_payments: {
         Row: {
@@ -548,7 +689,44 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_laporan_data: {
+        Args: {
+          p_end_date: string
+          p_jenis_sekolah?: string
+          p_jenis_tagihan?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
+      pay_student_bills: {
+        Args: {
+          p_admin_id?: string
+          p_bills: Json
+          p_receipt_id?: string
+          p_student_id: string
+        }
+        Returns: Json
+      }
+      record_psb_installment: {
+        Args: {
+          p_admin_id?: string
+          p_amount: number
+          p_candidate_id: string
+          p_notes?: string
+          p_payment_date: string
+          p_payment_method?: string
+        }
+        Returns: Json
+      }
+      sync_psb_candidate_to_student: {
+        Args: {
+          p_admin_id?: string
+          p_candidate_id: string
+          p_class_id: string
+          p_nis?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       audit_action_type: "INSERT" | "UPDATE" | "DELETE"
@@ -570,12 +748,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -599,11 +777,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -624,11 +802,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -649,11 +827,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -666,11 +844,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
