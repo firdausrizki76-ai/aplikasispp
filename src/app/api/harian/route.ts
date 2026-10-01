@@ -64,7 +64,7 @@ export async function GET() {
           target_grade,
           academic_year
         ),
-        profiles:received_by (
+        profiles (
           id,
           full_name
         )
@@ -127,10 +127,14 @@ export async function GET() {
 
     // Map PSB
     (psbData || []).forEach((item: any) => {
-      const candidateName = item.candidate?.full_name || 'Calon Siswa';
-      const grade = item.candidate?.target_grade || 'SD';
-      const reg = item.candidate?.registration_no || '';
-      const year = item.candidate?.academic_year || '2027/2028';
+      const candidateObj = Array.isArray(item.candidate) ? item.candidate[0] : item.candidate;
+      const profilesObj = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
+      const candidateName = candidateObj?.full_name || 'Calon Siswa';
+      const grade = candidateObj?.target_grade || 'SD';
+      const reg = candidateObj?.registration_no || '';
+      const year = candidateObj?.academic_year || '2027/2028';
+      const adminName = profilesObj?.full_name || 'Admin';
+
       unifiedList.push({
         id: item.id,
         sourceType: 'PSB',
@@ -143,7 +147,7 @@ export async function GET() {
         class_name: `Calon Siswa (${reg})`,
         category_label: `PSB Cicilan Ke-${item.installment_step} (T.A. ${year})`,
         payment_method: item.payment_method || 'TUNAI',
-        admin_name: item.profiles?.full_name || 'Admin',
+        admin_name: adminName,
         notes: item.notes || `Pembayaran cicilan uang masuk PSB`,
         raw: item,
       });
