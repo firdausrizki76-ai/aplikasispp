@@ -79,22 +79,39 @@ export default function HarianPage() {
     setPeriodFilter(type);
     setCurrentPage(1);
 
+    const formatJakartaDate = (d: Date) => {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+    };
+
     const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
+    const todayJakarta = formatJakartaDate(now);
+    const [yStr, mStr] = todayJakarta.split("-");
+    const y = parseInt(yStr, 10);
+    const m = parseInt(mStr, 10) - 1; // 0-indexed month
 
     if (type === "today") {
-      const todayStr = now.toISOString().slice(0, 10);
-      setStartDate(todayStr);
-      setEndDate(todayStr);
+      setStartDate(todayJakarta);
+      setEndDate(todayJakarta);
     } else if (type === "this_month") {
-      const start = new Date(y, m, 1).toISOString().slice(0, 10);
-      const end = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+      const start = `${yStr}-${mStr}-01`;
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      const end = `${yStr}-${mStr}-${String(lastDay).padStart(2, "0")}`;
       setStartDate(start);
       setEndDate(end);
     } else if (type === "last_month") {
-      const start = new Date(y, m - 1, 1).toISOString().slice(0, 10);
-      const end = new Date(y, m, 0).toISOString().slice(0, 10);
+      const lastMonthDate = new Date(y, m - 1, 1);
+      const ly = lastMonthDate.getFullYear();
+      const lm = lastMonthDate.getMonth() + 1;
+      const lyStr = String(ly);
+      const lmStr = String(lm).padStart(2, "0");
+      const start = `${lyStr}-${lmStr}-01`;
+      const lastDay = new Date(ly, lm, 0).getDate();
+      const end = `${lyStr}-${lmStr}-${String(lastDay).padStart(2, "0")}`;
       setStartDate(start);
       setEndDate(end);
     } else if (type === "all") {
@@ -145,7 +162,21 @@ export default function HarianPage() {
 
         // 3. Date Filtering
         if (periodFilter !== "all") {
-          const trxDate = (trx.payment_date || "").slice(0, 10);
+          const trxDate = (() => {
+            if (!trx.payment_date) return "";
+            try {
+              const d = new Date(trx.payment_date);
+              if (isNaN(d.getTime())) return trx.payment_date.slice(0, 10);
+              return new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Jakarta",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              }).format(d);
+            } catch {
+              return trx.payment_date.slice(0, 10);
+            }
+          })();
           if (startDate && trxDate < startDate) return false;
           if (endDate && trxDate > endDate) return false;
         }
@@ -818,18 +849,37 @@ export default function HarianPage() {
               ) : paginatedTransactions.length > 0 ? (
                 paginatedTransactions.map((trx) => {
                   const paymentDate = new Date(trx.payment_date);
-                  const formattedDate = paymentDate.toLocaleDateString("id-ID", {
-                    timeZone: "Asia/Jakarta",
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  });
+                  const isValidDate = !isNaN(paymentDate.getTime());
+                  const formattedDate = isValidDate
+                    ? paymentDate.toLocaleDateString("id-ID", {
+                        timeZone: "Asia/Jakarta",
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : trx.payment_date || "-";
+                  const formattedTime = isValidDate
+                    ? paymentDate
+                        .toLocaleTimeString("id-ID", {
+                          timeZone: "Asia/Jakarta",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })
+                        .replace(".", ":")
+                    : "";
 
                   return (
                     <tr key={trx.id} className="hover:bg-surface-container-low/40 transition-colors">
                       {/* Waktu */}
                       <td className="px-5 py-3.5 text-xs text-on-surface-variant whitespace-nowrap" suppressHydrationWarning>
                         <div className="font-semibold text-on-surface">{formattedDate}</div>
+                        {formattedTime && (
+                          <div className="text-[11px] text-on-surface-variant/80 font-medium flex items-center gap-1 mt-0.5">
+                            <span className="material-symbols-outlined text-[13px] text-primary">schedule</span>
+                            <span>{formattedTime} WIB</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Tingkat Siswa Badge */}

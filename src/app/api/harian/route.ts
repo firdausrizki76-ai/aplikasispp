@@ -135,12 +135,21 @@ export async function GET() {
       const year = candidateObj?.academic_year || '2027/2028';
       const adminName = profilesObj?.full_name || 'Admin';
 
+      let paymentTimestamp = item.created_at || item.payment_date;
+      if (item.payment_date && item.created_at) {
+        const dateStr = item.payment_date.slice(0, 10);
+        const timePart = item.created_at.includes('T')
+          ? item.created_at.split('T')[1]
+          : item.created_at.slice(11);
+        paymentTimestamp = `${dateStr}T${timePart}`;
+      }
+
       unifiedList.push({
         id: item.id,
         sourceType: 'PSB',
         sourceLabel: 'Uang Masuk PSB',
         receipt_id: item.receipt_no,
-        payment_date: item.payment_date || (item.created_at ? item.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
+        payment_date: paymentTimestamp,
         amount: Number(item.amount) || 0,
         student_name: candidateName,
         grade_level: grade,
@@ -158,7 +167,7 @@ export async function GET() {
       const studentClass = item.students?.classes?.class_name || item.students?.class_name || '-';
       const studentName = item.students?.name || 'Umum / Siswa';
       const grade = item.students?.grade_level || '-';
-      const saleDate = item.created_at ? item.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const saleDate = item.created_at || new Date().toISOString();
       unifiedList.push({
         id: item.id,
         sourceType: 'SERAGAM',
