@@ -377,7 +377,7 @@ export default function LaporanPage() {
     if (downloadFormat === "excel") {
       const wsData = [
         [`Laporan Transaksi Seragam ${jenjang}`],
-        ["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)"]
+        ["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)", "Metode"]
       ];
       
       (sales || []).forEach((s: any) => {
@@ -387,7 +387,8 @@ export default function LaporanPage() {
           pembeli,
           s.item_name || "-",
           s.quantity,
-          s.total_price
+          s.total_price,
+          s.payment_method || "TUNAI"
         ]);
       });
 
@@ -412,13 +413,14 @@ export default function LaporanPage() {
           pembeli,
           s.item_name || "-",
           s.quantity,
-          s.total_price.toLocaleString('id-ID')
+          s.total_price.toLocaleString('id-ID'),
+          s.payment_method || "TUNAI"
         ];
       });
 
       autoTable(doc, {
         startY: 30,
-        head: [["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)"]],
+        head: [["Tanggal", "Pembeli", "Barang", "Qty", "Total (Rp)", "Metode"]],
         body: body,
         theme: 'grid'
       });

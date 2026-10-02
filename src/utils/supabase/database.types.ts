@@ -443,6 +443,7 @@ export type Database = {
           created_at: string
           id: string
           item_name: string | null
+          payment_method: string | null
           quantity: number | null
           student_id: string | null
           total_price: number | null
@@ -451,6 +452,7 @@ export type Database = {
           created_at?: string
           id?: string
           item_name?: string | null
+          payment_method?: string | null
           quantity?: number | null
           student_id?: string | null
           total_price?: number | null
@@ -459,6 +461,7 @@ export type Database = {
           created_at?: string
           id?: string
           item_name?: string | null
+          payment_method?: string | null
           quantity?: number | null
           student_id?: string | null
           total_price?: number | null

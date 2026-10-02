@@ -83,6 +83,7 @@ export async function GET() {
         total_price,
         item_name,
         quantity,
+        payment_method,
         created_at,
         student_id,
         students (
@@ -179,7 +180,7 @@ export async function GET() {
         grade_level: grade,
         class_name: studentClass,
         category_label: `Seragam: ${item.item_name || 'Item'}${item.quantity ? ` (${item.quantity} pcs)` : ''}`,
-        payment_method: 'TUNAI',
+        payment_method: item.payment_method || 'TUNAI',
         admin_name: 'Kasir Toko',
         notes: `${item.item_name} x ${item.quantity || 1}`,
         raw: item,

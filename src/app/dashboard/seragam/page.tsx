@@ -22,6 +22,7 @@ export default function SeragamPage() {
   const [endDate, setEndDate] = useState("");
   const [salesGrade, setSalesGrade] = useState("all");
   const [selectedItemFilter, setSelectedItemFilter] = useState("all");
+  const [salesMethodFilter, setSalesMethodFilter] = useState<"all" | "TUNAI" | "TRANSFER">("all");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "amount_asc" | "student_asc">("date_desc");
 
   // Pagination for Sales
@@ -126,6 +127,7 @@ export default function SeragamPage() {
   const [formData, setFormData] = useState({ grade_level: 'SD', item_name: '', stock_quantity: '0', unit_price: '0' });
   const [editFormData, setEditFormData] = useState({ grade_level: 'SD', item_name: '', stock_quantity: '0', unit_price: '0' });
   const [transactionData, setTransactionData] = useState({ student_id: '', item_id: '', quantity: '1' });
+  const [transactionMethod, setTransactionMethod] = useState<"TUNAI" | "TRANSFER">("TUNAI");
   const [submitting, setSubmitting] = useState(false);
 
   // Handle Sales Period Change
@@ -217,6 +219,12 @@ export default function SeragamPage() {
         if (sale.item_name !== selectedItemFilter) return false;
       }
 
+      // 5. Payment Method Filter
+      if (salesMethodFilter !== "all") {
+        const method = sale.payment_method || "TUNAI";
+        if (method !== salesMethodFilter) return false;
+      }
+
       return true;
     }).sort((a, b) => {
       if (sortBy === "date_desc") {
@@ -236,7 +244,7 @@ export default function SeragamPage() {
       }
       return 0;
     });
-  }, [sales, salesSearch, salesPeriod, startDate, endDate, salesGrade, selectedItemFilter, sortBy]);
+  }, [sales, salesSearch, salesPeriod, startDate, endDate, salesGrade, selectedItemFilter, salesMethodFilter, sortBy]);
 
   // Reset Sales Filters
   const handleResetSalesFilters = () => {
@@ -246,6 +254,7 @@ export default function SeragamPage() {
     setEndDate("");
     setSalesGrade("all");
     setSelectedItemFilter("all");
+    setSalesMethodFilter("all");
     setSortBy("date_desc");
     setCurrentPage(1);
   };
@@ -263,6 +272,18 @@ export default function SeragamPage() {
   // Sales KPI Calculations
   const totalSalesRevenue = useMemo(() => {
     return filteredSales.reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
+  }, [filteredSales]);
+
+  const totalCashRevenue = useMemo(() => {
+    return filteredSales
+      .filter(s => (s.payment_method || 'TUNAI') === 'TUNAI')
+      .reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
+  }, [filteredSales]);
+
+  const totalTransferRevenue = useMemo(() => {
+    return filteredSales
+      .filter(s => s.payment_method === 'TRANSFER')
+      .reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
   }, [filteredSales]);
 
   const totalPcsSold = useMemo(() => {
@@ -400,7 +421,8 @@ export default function SeragamPage() {
       item_name: selectedItem.item_name,
       student_id: transactionData.student_id,
       quantity: qty,
-      total_price: totalPrice
+      total_price: totalPrice,
+      payment_method: transactionMethod
     }]);
 
     if (salesError) {
@@ -416,6 +438,7 @@ export default function SeragamPage() {
     setSubmitting(false);
     setIsTransactionModalOpen(false);
     setTransactionData({ student_id: '', item_id: '', quantity: '1' });
+    setTransactionMethod('TUNAI');
     fetchInventory();
     fetchSales();
     alert("Transaksi berhasil dicatat!");
@@ -450,7 +473,10 @@ export default function SeragamPage() {
             Tambah Stok &amp; Item
           </button>
           <button 
-            onClick={() => setIsTransactionModalOpen(true)}
+            onClick={() => {
+              setIsTransactionModalOpen(true);
+              setTransactionMethod("TUNAI");
+            }}
             className="bg-primary hover:bg-primary/90 text-on-primary px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all shadow-sm"
           >
             <span className="material-symbols-outlined text-base">add_shopping_cart</span>
@@ -491,9 +517,18 @@ export default function SeragamPage() {
           <div>
             <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Total Omzet</p>
             {userRole === 'pimpinan' ? (
-              <p className="text-2xl font-bold text-emerald-700 mt-1">
-                {loading ? "..." : `Rp ${totalSalesRevenue.toLocaleString('id-ID')}`}
-              </p>
+              <>
+                <p className="text-2xl font-bold text-emerald-700 mt-1">
+                  {loading ? "..." : `Rp ${totalSalesRevenue.toLocaleString('id-ID')}`}
+                </p>
+                {!loading && (
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-semibold">
+                    <span className="text-emerald-700">Tunai: Rp {totalCashRevenue.toLocaleString('id-ID')}</span>
+                    <span className="text-outline">•</span>
+                    <span className="text-blue-700">Transfer: Rp {totalTransferRevenue.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex items-center gap-1.5 mt-2 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[18px] text-outline">lock</span>
@@ -771,7 +806,7 @@ export default function SeragamPage() {
           </div>
 
           {/* Secondary Filters for Sales */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-outline-variant/40">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-2 border-t border-outline-variant/40">
             {salesPeriod === "custom" ? (
               <>
                 <div>
@@ -863,6 +898,25 @@ export default function SeragamPage() {
               </select>
             </div>
 
+            {/* Filter by Payment Method */}
+            <div>
+              <label className="block text-[11px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                Metode Bayar
+              </label>
+              <select
+                value={salesMethodFilter}
+                onChange={(e: any) => {
+                  setSalesMethodFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-1.5 bg-white border border-outline-variant rounded-lg text-xs font-medium"
+              >
+                <option value="all">Semua Metode</option>
+                <option value="TUNAI">TUNAI</option>
+                <option value="TRANSFER">TRANSFER</option>
+              </select>
+            </div>
+
             {/* Sort by */}
             <div>
               <label className="block text-[11px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
@@ -914,6 +968,9 @@ export default function SeragamPage() {
                 <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-xs sticky top-0">
                   Total Harga
                 </th>
+                <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-xs sticky top-0">
+                  Metode
+                </th>
                 <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-xs sticky top-0 text-center">
                   Aksi
                 </th>
@@ -922,7 +979,7 @@ export default function SeragamPage() {
             <tbody className="divide-y divide-outline-variant text-on-surface">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-on-surface-variant">Memuat riwayat penjualan...</td>
+                  <td colSpan={7} className="p-8 text-center text-on-surface-variant">Memuat riwayat penjualan...</td>
                 </tr>
               ) : paginatedSales.length > 0 ? (
                 paginatedSales.map(sale => {
@@ -966,6 +1023,19 @@ export default function SeragamPage() {
                       <td className="px-5 py-3.5 font-bold text-sm text-emerald-700">
                         Rp {(sale.total_price || 0).toLocaleString('id-ID')}
                       </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        {sale.payment_method === "TRANSFER" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="material-symbols-outlined text-[13px]">account_balance</span>
+                            TRANSFER
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="material-symbols-outlined text-[13px]">payments</span>
+                            TUNAI
+                          </span>
+                        )}
+                      </td>
                       <td className="px-5 py-3.5 text-center whitespace-nowrap">
                         {userRole === 'pimpinan' ? (
                           <button 
@@ -986,14 +1056,14 @@ export default function SeragamPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-on-surface-variant">
+                  <td colSpan={7} className="p-12 text-center text-on-surface-variant">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <span className="material-symbols-outlined text-4xl text-outline">history</span>
                       <p className="font-semibold text-base text-on-surface">Belum ada riwayat penjualan yang cocok.</p>
                       <p className="text-xs text-on-surface-variant">
                         Coba sesuaikan kata kunci pencarian atau pilih filter waktu lainnya.
                       </p>
-                      {(salesSearch || salesPeriod !== "all" || salesGrade !== "all" || selectedItemFilter !== "all") && (
+                      {(salesSearch || salesPeriod !== "all" || salesGrade !== "all" || selectedItemFilter !== "all" || salesMethodFilter !== "all") && (
                         <button
                           onClick={handleResetSalesFilters}
                           className="mt-2 px-4 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-semibold hover:bg-primary/90 transition-colors"
@@ -1206,10 +1276,22 @@ export default function SeragamPage() {
       {isTransactionModalOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
             <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl relative animate-in fade-in zoom-in duration-200">
-                <h3 className="font-headline-md text-primary mb-6 text-center tracking-tight flex items-center justify-center gap-2 font-bold text-xl">
-                  <span className="material-symbols-outlined text-2xl">add_shopping_cart</span>
-                  Catat Transaksi Seragam
-                </h3>
+                <div className="flex justify-between items-center mb-6 border-b border-outline-variant pb-3">
+                  <h3 className="font-headline-md text-primary tracking-tight flex items-center gap-2 font-bold text-xl">
+                    <span className="material-symbols-outlined text-2xl">add_shopping_cart</span>
+                    Catat Transaksi Seragam
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsTransactionModalOpen(false);
+                      setTransactionMethod("TUNAI");
+                    }}
+                    className="text-on-surface-variant hover:text-error transition-all"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
                 
                 <form onSubmit={handleTransactionSubmit} className="space-y-4">
                     <div>
@@ -1263,11 +1345,47 @@ export default function SeragamPage() {
                         </span>
                       </div>
                     )}
+
+                    {/* Pilihan Metode Pembayaran: TUNAI vs TRANSFER */}
+                    <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant space-y-2">
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                        Metode Pembayaran *
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setTransactionMethod("TUNAI")}
+                          className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                            transactionMethod === "TUNAI"
+                              ? "bg-green-50 border-green-500 text-green-800 ring-2 ring-green-500/20 shadow-sm"
+                              : "bg-white border-outline-variant text-on-surface hover:bg-surface-container"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">payments</span>
+                          TUNAI (Kasir)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTransactionMethod("TRANSFER")}
+                          className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                            transactionMethod === "TRANSFER"
+                              ? "bg-blue-50 border-blue-500 text-blue-800 ring-2 ring-blue-500/20 shadow-sm"
+                              : "bg-white border-outline-variant text-on-surface hover:bg-surface-container"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">account_balance</span>
+                          TRANSFER BANK
+                        </button>
+                      </div>
+                    </div>
                     
                     <div className="flex gap-3 mt-8">
                         <button 
                             type="button"
-                            onClick={() => setIsTransactionModalOpen(false)}
+                            onClick={() => {
+                              setIsTransactionModalOpen(false);
+                              setTransactionMethod("TUNAI");
+                            }}
                             className="flex-1 px-4 py-2.5 border border-outline text-on-surface rounded-xl hover:bg-surface-container transition-colors font-bold text-sm"
                         >
                             Batal
