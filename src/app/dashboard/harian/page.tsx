@@ -364,7 +364,7 @@ export default function HarianPage() {
           trx_id: editingTrx.id,
           sourceType: editingTrx.sourceType,
           payment_method: editPaymentMethod,
-          payment_date: editPaymentDate ? new Date(editPaymentDate).toISOString() : undefined,
+          payment_date: userRole === "pimpinan" && editPaymentDate ? new Date(editPaymentDate).toISOString() : undefined,
           notes: editNotes,
           userId: user?.id,
         }),
@@ -1024,7 +1024,7 @@ export default function HarianPage() {
                           <button
                             onClick={() => handleOpenEditModal(trx)}
                             className="text-primary hover:bg-primary/10 hover:text-blue-700 p-1.5 rounded-lg transition-colors inline-flex items-center justify-center"
-                            title="Edit transaksi (metode pembayaran, tanggal, dll)"
+                            title={userRole === "pimpinan" ? "Edit transaksi (metode pembayaran & tanggal)" : "Edit transaksi (metode pembayaran: tunai/transfer)"}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
@@ -1192,17 +1192,41 @@ export default function HarianPage() {
 
               {/* Tanggal & Waktu Transaksi */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Tanggal &amp; Waktu Transaksi
-                </label>
-                <input
-                  type="datetime-local"
-                  value={editPaymentDate}
-                  onChange={(e) => setEditPaymentDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-xl text-sm outline-none focus:border-primary"
-                  required
-                />
-                <p className="text-[11px] text-slate-500 mt-1">Sesuaikan tanggal/jam jika ada kesalahan pencatatan waktu.</p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Tanggal &amp; Waktu Transaksi
+                  </label>
+                  {userRole !== "pimpinan" && (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">lock</span>
+                      Khusus Pimpinan
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type="datetime-local"
+                    value={editPaymentDate}
+                    onChange={(e) => setEditPaymentDate(e.target.value)}
+                    disabled={userRole !== "pimpinan"}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-sm outline-none transition-colors ${
+                      userRole === "pimpinan"
+                        ? "bg-surface border border-outline-variant focus:border-primary text-slate-800"
+                        : "bg-slate-100 border border-slate-200 text-slate-500 cursor-not-allowed select-none pr-10"
+                    }`}
+                    required={userRole === "pimpinan"}
+                  />
+                  {userRole !== "pimpinan" && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <span className="material-symbols-outlined text-[18px]">lock</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {userRole === "pimpinan"
+                    ? "Sesuaikan tanggal/jam jika ada kesalahan pencatatan waktu."
+                    : "🔒 Hanya akun Pimpinan yang memiliki wewenang mengubah tanggal & waktu transaksi. Admin hanya dapat mengubah metode pembayaran (Tunai/Transfer)."}
+                </p>
               </div>
 
               {/* Catatan (if PSB or available) */}

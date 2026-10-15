@@ -25,6 +25,33 @@ export async function POST(req: Request) {
 
     let parsedDateIso: string | undefined;
     if (payment_date) {
+      if (!userId) {
+        return NextResponse.json({ 
+          success: false, 
+          error: "Akses ditolak: User ID diperlukan untuk mengubah tanggal transaksi" 
+        }, { status: 403 });
+      }
+
+      // Check role in profiles table
+      const { data: userProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      let role = userProfile?.role?.toLowerCase();
+      if (!role) {
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+        role = authUser.user?.user_metadata?.role?.toLowerCase();
+      }
+
+      if (role !== "pimpinan") {
+        return NextResponse.json({ 
+          success: false, 
+          error: "Akses ditolak: Hanya akun Pimpinan yang memiliki wewenang untuk mengubah tanggal & waktu transaksi" 
+        }, { status: 403 });
+      }
+
       const d = new Date(payment_date);
       if (isNaN(d.getTime())) {
         return NextResponse.json({ success: false, error: "Format tanggal tidak valid" }, { status: 400 });
