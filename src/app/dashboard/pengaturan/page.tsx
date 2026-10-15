@@ -2,8 +2,137 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { clearTunggakanCache } from "@/utils/tunggakanCache";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+
+function SearchableStudentSelect({
+  students,
+  classes,
+  selectedStudent,
+  onSelectStudent,
+  placeholder = "Ketik nama siswa atau NIS..."
+}: {
+  students: any[];
+  classes: any[];
+  selectedStudent: any | null;
+  onSelectStudent: (student: any | null) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return students
+      .filter((s) => (s.name && s.name.toLowerCase().includes(q)) || (s.nis && s.nis.toLowerCase().includes(q)))
+      .slice(0, 10);
+  }, [students, query]);
+
+  const getClassName = (classId: string) => {
+    const c = classes.find((cl) => cl.id === classId);
+    return c ? `Kelas ${c.class_name}` : "-";
+  };
+
+  if (selectedStudent) {
+    return (
+      <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[18px]">person</span>
+          </div>
+          <div className="truncate">
+            <div className="font-bold text-sm text-slate-800 truncate">{selectedStudent.name}</div>
+            <div className="text-xs text-slate-500">
+              NIS: {selectedStudent.nis || "-"} • {getClassName(selectedStudent.class_id)}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelectStudent(null)}
+          className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 hover:bg-red-50 rounded ml-2 shrink-0 transition-colors"
+        >
+          Ganti Siswa
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <div className="relative">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          className="w-full pl-9 pr-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-primary text-sm"
+        />
+        <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+          search
+        </span>
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        )}
+      </div>
+
+      {isOpen && query.trim() !== "" && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-outline-variant rounded-lg shadow-lg z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+          {filtered.length > 0 ? (
+            filtered.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  onSelectStudent(s);
+                  setQuery("");
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between gap-2"
+              >
+                <div>
+                  <div className="font-semibold text-sm text-slate-800">{s.name}</div>
+                  <div className="text-xs text-slate-500">
+                    NIS: {s.nis || "-"} • {getClassName(s.class_id)}
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-primary px-2 py-0.5 rounded bg-primary/10 shrink-0">
+                  {s.grade_level || "SD"}
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="p-3 text-center text-xs text-slate-500">
+              Tidak ada siswa yang cocok dengan &quot;{query}&quot;
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PengaturanPage() {
   const [masterTagihan, setMasterTagihan] = useState<any[]>([]);
@@ -23,6 +152,9 @@ export default function PengaturanPage() {
 
   // Bulk Generate Form States
   const [bulkTarget, setBulkTarget] = useState("Semua Siswa");
+  const [bulkTargetType, setBulkTargetType] = useState<"all" | "class" | "student">("all");
+  const [bulkTargetClassId, setBulkTargetClassId] = useState("");
+  const [bulkSelectedStudent, setBulkSelectedStudent] = useState<any | null>(null);
   const [bulkJenis, setBulkJenis] = useState("");
   const [bulkNominal, setBulkNominal] = useState("");
   const [bulkMulaiBulan, setBulkMulaiBulan] = useState("");
@@ -31,6 +163,9 @@ export default function PengaturanPage() {
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   
   // Bulk delete states
+  const [bulkDeleteTargetType, setBulkDeleteTargetType] = useState<"all" | "class" | "student">("all");
+  const [bulkDeleteClassId, setBulkDeleteClassId] = useState("");
+  const [bulkDeleteSelectedStudent, setBulkDeleteSelectedStudent] = useState<any | null>(null);
   const [bulkDeleteJenis, setBulkDeleteJenis] = useState("");
   const [bulkDeleteMulaiBulan, setBulkDeleteMulaiBulan] = useState("");
   const [bulkDeleteMulaiTahun, setBulkDeleteMulaiTahun] = useState(new Date().getFullYear().toString());
@@ -130,13 +265,22 @@ export default function PengaturanPage() {
     
     try {
       let targetList = [];
-      if (bulkTarget === "Semua Siswa") {
+      if (bulkTargetType === "all") {
         targetList = students.filter(s => s.status === 'aktif');
-      } else if (bulkTarget.startsWith("Kelas:")) {
-        const classId = bulkTarget.split(":")[1];
-        targetList = students.filter(s => s.class_id === classId && s.status === 'aktif');
+      } else if (bulkTargetType === "class") {
+        if (!bulkTargetClassId) {
+          alert("Silakan pilih kelas terlebih dahulu.");
+          setBulkSubmitting(false);
+          return;
+        }
+        targetList = students.filter(s => s.class_id === bulkTargetClassId && s.status === 'aktif');
       } else {
-        targetList = students.filter(s => s.id === bulkTarget);
+        if (!bulkSelectedStudent) {
+          alert("Silakan pilih nama siswa terlebih dahulu.");
+          setBulkSubmitting(false);
+          return;
+        }
+        targetList = students.filter(s => s.id === bulkSelectedStudent.id);
       }
 
       if (targetList.length === 0) {
@@ -196,6 +340,9 @@ export default function PengaturanPage() {
         setBulkMulaiBulan("");
         setBulkMulaiTahun("");
         setBulkDurasi("1");
+        setBulkTargetType("all");
+        setBulkTargetClassId("");
+        setBulkSelectedStudent(null);
       }
     } catch (err: any) {
       alert("Gagal generate: " + err.message);
@@ -208,12 +355,32 @@ export default function PengaturanPage() {
     e.preventDefault();
     if (!bulkDeleteJenis || !bulkDeleteMulaiBulan || !bulkDeleteMulaiTahun) return;
     
+    if (bulkDeleteTargetType === "class" && !bulkDeleteClassId) {
+      alert("Silakan pilih kelas terlebih dahulu untuk hapus masal.");
+      return;
+    }
+    if (bulkDeleteTargetType === "student" && !bulkDeleteSelectedStudent) {
+      alert("Silakan cari dan pilih siswa terlebih dahulu untuk hapus masal.");
+      return;
+    }
+
     let blnLabel = bulkDeleteMulaiBulan;
     if (bulkDeleteMulaiBulan !== 'all') {
       blnLabel = monthsStr[parseInt(bulkDeleteMulaiBulan)] + ' ' + bulkDeleteMulaiTahun;
     }
 
-    if (!confirm(`PERINGATAN: Apakah Anda yakin ingin menghapus masal tagihan "${bulkDeleteJenis}" untuk ${bulkDeleteMulaiBulan === 'all' ? `seluruh bulan pada tahun ${bulkDeleteMulaiTahun}` : `bulan ${blnLabel}`}? Hanya tagihan dengan status "Belum Lunas" yang akan terhapus secara permanen.`)) {
+    let targetDesc = "seluruh siswa";
+    let targetLabel = "";
+    if (bulkDeleteTargetType === "class") {
+      const cls = classes.find(c => c.id === bulkDeleteClassId);
+      targetLabel = cls ? `Kelas ${cls.class_name}` : "Kelas terpilih";
+      targetDesc = `seluruh siswa di ${targetLabel}`;
+    } else if (bulkDeleteTargetType === "student") {
+      targetLabel = bulkDeleteSelectedStudent.name;
+      targetDesc = `siswa ${targetLabel}`;
+    }
+
+    if (!confirm(`PERINGATAN: Apakah Anda yakin ingin menghapus masal tagihan "${bulkDeleteJenis}" untuk ${targetDesc} pada ${bulkDeleteMulaiBulan === 'all' ? `seluruh bulan pada tahun ${bulkDeleteMulaiTahun}` : `bulan ${blnLabel}`}? Hanya tagihan dengan status "Belum Lunas" yang akan terhapus secara permanen.`)) {
       return;
     }
     
@@ -227,6 +394,9 @@ export default function PengaturanPage() {
           jenis_tagihan: bulkDeleteJenis,
           bulan_tagihan: blnLabel,
           tahun: bulkDeleteMulaiTahun,
+          target_type: bulkDeleteTargetType,
+          target_id: bulkDeleteTargetType === "class" ? bulkDeleteClassId : (bulkDeleteTargetType === "student" ? bulkDeleteSelectedStudent.id : null),
+          target_label: targetLabel,
           userId: user?.id
         })
       });
@@ -241,6 +411,9 @@ export default function PengaturanPage() {
       setBulkDeleteJenis("");
       setBulkDeleteMulaiBulan("");
       setBulkDeleteMulaiTahun(new Date().getFullYear().toString());
+      setBulkDeleteTargetType("all");
+      setBulkDeleteClassId("");
+      setBulkDeleteSelectedStudent(null);
     } catch (err: any) {
       alert("Gagal menghapus masal: " + err.message);
     } finally {
@@ -358,25 +531,93 @@ export default function PengaturanPage() {
                 <div className="p-6">
                   <form onSubmit={handleBulkGenerate} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Target Siswa</label>
-                      <select 
-                        value={bulkTarget}
-                        onChange={(e) => setBulkTarget(e.target.value)}
-                        className="w-full px-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-primary"
-                        required
-                      >
-                        <option value="Semua Siswa">Semua Siswa (Aktif)</option>
-                        <optgroup label="Per Kelas">
-                          {classes.map(c => (
-                            <option key={c.id} value={`Kelas:${c.id}`}>Kelas {c.class_name} ({c.grade_level})</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Individu Siswa">
-                          {students.map(s => (
-                            <option key={s.id} value={s.id}>{s.name} ({s.nis})</option>
-                          ))}
-                        </optgroup>
-                      </select>
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Target Siswa</label>
+                      <div className="grid grid-cols-3 gap-2 mb-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBulkTargetType("all");
+                            setBulkTarget("Semua Siswa");
+                          }}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                            bulkTargetType === "all"
+                              ? "bg-primary text-white border-primary shadow-sm"
+                              : "bg-surface hover:bg-slate-100 border-outline-variant text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">groups</span>
+                          Semua Siswa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBulkTargetType("class");
+                            if (classes.length > 0 && !bulkTargetClassId) {
+                              setBulkTargetClassId(classes[0].id);
+                              setBulkTarget(`Kelas:${classes[0].id}`);
+                            }
+                          }}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                            bulkTargetType === "class"
+                              ? "bg-primary text-white border-primary shadow-sm"
+                              : "bg-surface hover:bg-slate-100 border-outline-variant text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">meeting_room</span>
+                          Per Kelas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBulkTargetType("student");
+                            if (bulkSelectedStudent) {
+                              setBulkTarget(bulkSelectedStudent.id);
+                            }
+                          }}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                            bulkTargetType === "student"
+                              ? "bg-primary text-white border-primary shadow-sm"
+                              : "bg-surface hover:bg-slate-100 border-outline-variant text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">person_search</span>
+                          Per Siswa
+                        </button>
+                      </div>
+
+                      {bulkTargetType === "class" && (
+                        <div>
+                          <select
+                            value={bulkTargetClassId}
+                            onChange={(e) => {
+                              setBulkTargetClassId(e.target.value);
+                              setBulkTarget(`Kelas:${e.target.value}`);
+                            }}
+                            className="w-full px-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-primary text-sm"
+                            required
+                          >
+                            <option value="" disabled>-- Pilih Kelas --</option>
+                            {classes.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                Kelas {c.class_name} ({c.grade_level})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {bulkTargetType === "student" && (
+                        <SearchableStudentSelect
+                          students={students}
+                          classes={classes}
+                          selectedStudent={bulkSelectedStudent}
+                          onSelectStudent={(s) => {
+                            setBulkSelectedStudent(s);
+                            setBulkTarget(s ? s.id : "");
+                          }}
+                          placeholder="Ketik nama atau NIS siswa (contoh: abdillah)..."
+                        />
+                      )}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
@@ -474,6 +715,81 @@ export default function PengaturanPage() {
                 </div>
                 <div className="p-6">
                   <form onSubmit={handleBulkDeleteBills} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Target Siswa yang Dihapus</label>
+                      <div className="grid grid-cols-3 gap-2 mb-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setBulkDeleteTargetType("all")}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                            bulkDeleteTargetType === "all"
+                              ? "bg-red-600 text-white border-red-600 shadow-sm"
+                              : "bg-surface hover:bg-red-50 border-outline-variant text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">groups</span>
+                          Semua Siswa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBulkDeleteTargetType("class");
+                            if (classes.length > 0 && !bulkDeleteClassId) {
+                              setBulkDeleteClassId(classes[0].id);
+                            }
+                          }}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                            bulkDeleteTargetType === "class"
+                              ? "bg-red-600 text-white border-red-600 shadow-sm"
+                              : "bg-surface hover:bg-red-50 border-outline-variant text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">meeting_room</span>
+                          Per Kelas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBulkDeleteTargetType("student")}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                            bulkDeleteTargetType === "student"
+                              ? "bg-red-600 text-white border-red-600 shadow-sm"
+                              : "bg-surface hover:bg-red-50 border-outline-variant text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">person_search</span>
+                          Per Siswa
+                        </button>
+                      </div>
+
+                      {bulkDeleteTargetType === "class" && (
+                        <div>
+                          <select
+                            value={bulkDeleteClassId}
+                            onChange={(e) => setBulkDeleteClassId(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface border border-outline-variant rounded-lg outline-none focus:border-red-400 text-sm"
+                            required
+                          >
+                            <option value="" disabled>-- Pilih Kelas --</option>
+                            {classes.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                Kelas {c.class_name} ({c.grade_level})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {bulkDeleteTargetType === "student" && (
+                        <SearchableStudentSelect
+                          students={students}
+                          classes={classes}
+                          selectedStudent={bulkDeleteSelectedStudent}
+                          onSelectStudent={(s) => setBulkDeleteSelectedStudent(s)}
+                          placeholder="Ketik nama atau NIS siswa yang tagihannya ingin dihapus..."
+                        />
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1">Jenis Tagihan</label>

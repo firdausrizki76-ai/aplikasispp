@@ -42,6 +42,8 @@ export default function TunggakanPage() {
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<ArrearsSummary | null>(null);
+  const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+  const [isDeletingBills, setIsDeletingBills] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [masterBillsMap, setMasterBillsMap] = useState<Record<string, number>>({});
 
@@ -135,6 +137,48 @@ export default function TunggakanPage() {
     } catch (err: any) {
       alert("Terjadi kesalahan: " + err.message);
     }
+  };
+
+  const handleDeleteSelectedBills = async () => {
+    if (selectedBillIds.length === 0 || !selectedStudent) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedBillIds.length} tagihan yang ditandai secara permanen? Tindakan ini tidak dapat dibatalkan.`)) return;
+    
+    setIsDeletingBills(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const res = await fetch('/api/bills/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          billIds: selectedBillIds,
+          userId: user?.id,
+          actionDetails: `Menghapus ${selectedBillIds.length} tagihan untuk siswa ${selectedStudent.student?.name || ''} secara permanen`
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        alert(`Berhasil menghapus ${selectedBillIds.length} tagihan.`);
+        setSelectedBillIds([]);
+        setSelectedStudent(null);
+        fetchArrears(true);
+      } else {
+        alert("Gagal menghapus tagihan: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setIsDeletingBills(false);
+    }
+  };
+
+  const openStudentDetails = (d: ArrearsSummary) => {
+    setSelectedBillIds([]);
+    setEditingBillId(null);
+    setSelectedStudent(d);
   };
 
   // Filters
@@ -292,7 +336,7 @@ export default function TunggakanPage() {
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
 
-    const filteredBills = summary.bills.filter(bill => {
+    let filteredBills = summary.bills.filter(bill => {
       if (!bill.tanggal_jatuh_tempo) return true;
       const dueDate = new Date(bill.tanggal_jatuh_tempo);
       if (isNaN(dueDate.getTime())) return true;
@@ -303,8 +347,12 @@ export default function TunggakanPage() {
       return dueYear < currentYear || (dueYear === currentYear && dueMonth <= currentMonth);
     });
 
+    if (filteredBills.length === 0 && summary.bills.length > 0) {
+      filteredBills = summary.bills;
+    }
+
     if (filteredBills.length === 0) {
-      alert("Tidak ada tagihan yang tertunggak sampai dengan bulan ini.");
+      alert("Tidak ada tagihan yang tertunggak.");
       return;
     }
 
@@ -586,39 +634,7 @@ Terima kasih atas perhatian dan kerja sama Ayah/Bunda. Semoga Allah SWT senantia
   };
 
   const handleSendOtherWA = (d: OtherArrearsItem) => {
-    const rawPhone = d.student.parent_phone;
-    const phone = formatWhatsAppNumber(rawPhone);
-    if (!phone) {
-      alert("Nomor WhatsApp orang tua tidak tersedia untuk siswa ini.");
-      return;
-    }
-    const rincian = d.nonSppBills.map((b: any) => `- ${b.jenis_tagihan} ${b.bulan_tagihan ? `(${b.bulan_tagihan})` : ''}: Rp ${Number(b.nominal).toLocaleString('id-ID')}`).join('\n');
-    const total = d.totalNonSpp.toLocaleString('id-ID');
-    const className = d.student.classes?.class_name || (d.student as any).class_name || '-';
-    
-    const text = `*PEMBERITAHUAN TUNGGAKAN KEGIATAN & ADMINISTRASI SEKOLAH*
-*SD-SMP TARUNA ISLAM PEKANBARU*
-----------------------------------------
-Nama Siswa : *${d.student.name}*
-Kelas      : *${className}*
-Jenjang    : *${d.student.grade_level}*
-
-*RINCIAN TAGIHAN BELUM LUNAS:*
-${rincian}
-
-*TOTAL KEWAJIBAN: Rp ${total}*
-----------------------------------------
-Assalamu'alaikum Warahmatullahi Wabarakatuh.
-Yth. Ayah/Bunda dari ananda *${d.student.name}*, kami menginformasikan perihal kewajiban tagihan sekolah di atas yang saat ini tercatat belum diselesaikan di sistem administrasi kami.
-
-Pembayaran dapat dilakukan melalui kasir sekolah secara tunai atau melalui transfer ke rekening resmi yayasan. Apabila Ayah/Bunda telah melakukan pembayaran, mohon berkenan mengirimkan bukti transfer/resi untuk kami lakukan verifikasi data.
-
-Terima kasih atas kerja sama dan perhatian Ayah/Bunda.
-
-_Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
-
-    const waUrl = `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(text)}`;
-    window.open(waUrl, "_blank");
+    handleSendWA(d);
   };
 
   const today = new Date();
@@ -764,7 +780,7 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
                         <td className="px-6 py-4">{d.student.classes?.class_name || (d.student as any).class_name || '-'}</td>
                         <td className="px-6 py-4">
                           <button 
-                            onClick={() => setSelectedStudent(d)}
+                            onClick={() => openStudentDetails(d)}
                             className="text-error font-bold flex items-center gap-1 hover:underline hover:text-red-700 transition-colors"
                             title="Klik untuk melihat rincian tagihan"
                           >
@@ -958,7 +974,7 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
                         </td>
                         <td className="px-6 py-4">
                           <button 
-                            onClick={() => setSelectedStudent(d)}
+                            onClick={() => openStudentDetails(d)}
                             className="text-error font-bold flex items-center gap-1 hover:underline hover:text-red-700 transition-colors"
                             title="Klik untuk melihat rincian seluruh tagihan"
                           >
@@ -1207,7 +1223,7 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
                         </td>
                         <td className="px-6 py-4">
                           <button
-                            onClick={() => setSelectedStudent(d)}
+                            onClick={() => openStudentDetails(d)}
                             className="text-error font-bold flex items-center gap-1 hover:underline transition-colors"
                             title="Klik untuk rincian semua tagihan"
                           >
@@ -1254,22 +1270,73 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
             <div className="flex justify-between items-center p-5 border-b border-outline-variant bg-surface-container-lowest">
               <div>
                 <h3 className="font-title-lg text-title-lg text-primary">Rincian Tagihan</h3>
-                <p className="text-sm text-on-surface-variant mt-1">{selectedStudent.student.name}</p>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  {selectedStudent.student.name} {selectedStudent.student.classes?.class_name ? `(${selectedStudent.student.classes.class_name})` : ''}
+                </p>
               </div>
               <button 
-                onClick={() => setSelectedStudent(null)}
+                onClick={() => {
+                  setSelectedStudent(null);
+                  setSelectedBillIds([]);
+                }}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             
+            {/* Toolbar Tandai Hapus Masal */}
+            {userRole === 'pimpinan' && selectedStudent.bills && selectedStudent.bills.length > 0 && (
+              <div className="px-5 py-2.5 bg-slate-50 border-b border-outline-variant flex items-center justify-between gap-3 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700 select-none">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 cursor-pointer"
+                    checked={selectedStudent.bills.length > 0 && selectedBillIds.length === selectedStudent.bills.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedBillIds(selectedStudent.bills.map(b => b.id));
+                      } else {
+                        setSelectedBillIds([]);
+                      }
+                    }}
+                  />
+                  <span>Tandai Semua ({selectedStudent.bills.length})</span>
+                </label>
+                <button
+                  type="button"
+                  disabled={selectedBillIds.length === 0 || isDeletingBills}
+                  onClick={handleDeleteSelectedBills}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded-lg font-bold flex items-center gap-1 transition-colors shadow-sm disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                  <span>{isDeletingBills ? 'Menghapus...' : `Hapus Ditandai (${selectedBillIds.length})`}</span>
+                </button>
+              </div>
+            )}
+
             <div className="p-6 overflow-y-auto flex-1">
               <ul className="space-y-3">
-                {selectedStudent.bills.map((bill, index) => (
-                  <li key={bill.id || index} className="flex justify-between items-center p-4 rounded-xl border border-outline-variant bg-surface-container-lowest">
+                {selectedStudent.bills.map((bill, index) => {
+                  const isChecked = selectedBillIds.includes(bill.id);
+                  return (
+                  <li key={bill.id || index} className={`flex justify-between items-center p-3.5 rounded-xl border transition-colors ${isChecked ? 'border-red-300 bg-red-50/50' : 'border-outline-variant bg-surface-container-lowest'}`}>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-error-container text-error flex items-center justify-center">
+                      {userRole === 'pimpinan' && (
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBillIds(prev => [...prev, bill.id]);
+                            } else {
+                              setSelectedBillIds(prev => prev.filter(id => id !== bill.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-red-600 focus:ring-red-500 border-gray-300 shrink-0 cursor-pointer"
+                        />
+                      )}
+                      <div className="w-10 h-10 rounded-full bg-error-container text-error flex items-center justify-center shrink-0">
                         <span className="material-symbols-outlined">receipt_long</span>
                       </div>
                       <div>
@@ -1334,7 +1401,8 @@ _Wassalamu'alaikum Warahmatullahi Wabarakatuh._`;
                       )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
             

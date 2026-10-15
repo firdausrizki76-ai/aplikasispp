@@ -9,16 +9,20 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
   try {
-    const { billId, userId, actionDetails } = await request.json();
+    const { billId, billIds, userId, actionDetails } = await request.json();
     
-    if (!billId) {
-      return NextResponse.json({ success: false, error: 'Bill ID is required' }, { status: 400 });
+    const ids: string[] = Array.isArray(billIds) 
+      ? billIds.filter(Boolean) 
+      : (billId ? [billId] : []);
+    
+    if (ids.length === 0) {
+      return NextResponse.json({ success: false, error: 'Bill ID atau billIds diperlukan' }, { status: 400 });
     }
       
     const { error } = await supabaseAdmin
       .from('student_bills')
       .delete()
-      .eq('id', billId);
+      .in('id', ids);
       
     if (error) {
       throw new Error(error.message);
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
       await supabaseAdmin
         .from('audit_logs')
         .update({ user_id: userId })
-        .eq('record_id', billId)
+        .in('record_id', ids)
         .is('user_id', null)
         .eq('action', 'DELETE');
         
@@ -38,11 +42,11 @@ export async function POST(request: Request) {
         userId, 
         "Hapus Tagihan", 
         "student_bills", 
-        actionDetails || `Menghapus tagihan secara permanen`
+        actionDetails || `Menghapus ${ids.length} tagihan secara permanen`
       );
     }
 
-    return NextResponse.json({ success: true, message: 'Tagihan berhasil dihapus' });
+    return NextResponse.json({ success: true, count: ids.length, message: `${ids.length} tagihan berhasil dihapus` });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

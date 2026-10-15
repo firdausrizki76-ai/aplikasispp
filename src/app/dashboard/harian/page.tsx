@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
 
 interface UnifiedTransaction {
@@ -42,6 +43,14 @@ export default function HarianPage() {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
+
+  // Edit Transaction State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTrx, setEditingTrx] = useState<UnifiedTransaction | null>(null);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<"TUNAI" | "TRANSFER">("TUNAI");
+  const [editPaymentDate, setEditPaymentDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
@@ -316,6 +325,64 @@ export default function HarianPage() {
       } catch (err: any) {
         alert("Terjadi kesalahan: " + err.message);
       }
+    }
+  };
+
+  const toLocalDatetimeInput = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const y = d.getFullYear();
+    const m = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const h = pad(d.getHours());
+    const min = pad(d.getMinutes());
+    return `${y}-${m}-${day}T${h}:${min}`;
+  };
+
+  const handleOpenEditModal = (trx: UnifiedTransaction) => {
+    setEditingTrx(trx);
+    setEditPaymentMethod((trx.payment_method?.toUpperCase() === "TRANSFER" ? "TRANSFER" : "TUNAI") as "TUNAI" | "TRANSFER");
+    setEditPaymentDate(toLocalDatetimeInput(trx.payment_date));
+    setEditNotes(trx.notes || "");
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTrx) return;
+
+    setIsSavingEdit(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const res = await fetch("/api/harian/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trx_id: editingTrx.id,
+          sourceType: editingTrx.sourceType,
+          payment_method: editPaymentMethod,
+          payment_date: editPaymentDate ? new Date(editPaymentDate).toISOString() : undefined,
+          notes: editNotes,
+          userId: user?.id,
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert("Transaksi berhasil diperbarui.");
+        setIsEditModalOpen(false);
+        setEditingTrx(null);
+        fetchTransactions();
+      } else {
+        alert("Gagal memperbarui transaksi: " + (result.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -953,8 +1020,15 @@ export default function HarianPage() {
 
                       {/* Aksi */}
                       <td className="px-5 py-3.5 text-center whitespace-nowrap">
-                        {trx.sourceType === "SPP" ? (
-                          userRole === "pimpinan" ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditModal(trx)}
+                            className="text-primary hover:bg-primary/10 hover:text-blue-700 p-1.5 rounded-lg transition-colors inline-flex items-center justify-center"
+                            title="Edit transaksi (metode pembayaran, tanggal, dll)"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>
+                          {trx.sourceType === "SPP" && userRole === "pimpinan" && (
                             <button
                               onClick={() => handleDeleteTransaction(trx)}
                               className="text-error hover:bg-error-container hover:text-red-800 p-1.5 rounded-lg transition-colors inline-flex items-center justify-center"
@@ -962,19 +1036,8 @@ export default function HarianPage() {
                             >
                               <span className="material-symbols-outlined text-[18px]">delete</span>
                             </button>
-                          ) : (
-                            <span
-                              className="text-[11px] text-on-surface-variant/70 italic cursor-help"
-                              title="Hanya pimpinan yang dapat membatalkan transaksi"
-                            >
-                              -
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-[11px] text-on-surface-variant/70 italic">
-                            {trx.sourceType === "PSB" ? "Kwitansi PSB" : "Toko"}
-                          </span>
-                        )}
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1051,6 +1114,148 @@ export default function HarianPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Transaction Modal */}
+      {isEditModalOpen && editingTrx && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl border border-outline-variant overflow-hidden flex flex-col my-auto">
+            <div className="flex justify-between items-center p-5 border-b border-outline-variant bg-surface-container-lowest">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-xl">edit_note</span>
+                </div>
+                <div>
+                  <h3 className="font-title-lg text-title-lg text-primary">Edit Transaksi</h3>
+                  <p className="text-xs text-on-surface-variant">{editingTrx.receipt_id}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingTrx(null);
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              {/* Transaction Summary Card */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Siswa:</span>
+                  <span className="font-bold text-slate-800">{editingTrx.student_name} ({editingTrx.class_name})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Tagihan / Jenis:</span>
+                  <span className="font-semibold text-slate-700">{editingTrx.category_label}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-200">
+                  <span className="text-slate-500 font-medium">Nominal:</span>
+                  <span className="font-bold text-sm text-emerald-700">Rp {Number(editingTrx.amount).toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              {/* Metode Pembayaran */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Metode Pembayaran *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditPaymentMethod("TUNAI")}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-sm transition-all ${
+                      editPaymentMethod === "TUNAI"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-300"
+                        : "bg-surface border-outline-variant text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">payments</span>
+                    TUNAI (CASH)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditPaymentMethod("TRANSFER")}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-sm transition-all ${
+                      editPaymentMethod === "TRANSFER"
+                        ? "bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-300"
+                        : "bg-surface border-outline-variant text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">account_balance</span>
+                    TRANSFER
+                  </button>
+                </div>
+              </div>
+
+              {/* Tanggal & Waktu Transaksi */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Tanggal &amp; Waktu Transaksi
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editPaymentDate}
+                  onChange={(e) => setEditPaymentDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-xl text-sm outline-none focus:border-primary"
+                  required
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Sesuaikan tanggal/jam jika ada kesalahan pencatatan waktu.</p>
+              </div>
+
+              {/* Catatan (if PSB or available) */}
+              {editingTrx.sourceType === "PSB" && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Catatan Kwitansi
+                  </label>
+                  <input
+                    type="text"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Catatan kwitansi PSB..."
+                    className="w-full px-3.5 py-2.5 bg-surface border border-outline-variant rounded-xl text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-3 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingTrx(null);
+                  }}
+                  className="flex-1 py-2.5 border border-outline-variant text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="flex-1 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow disabled:opacity-50"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin text-[18px]">refresh</span>
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">save</span>
+                      Simpan Perubahan
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

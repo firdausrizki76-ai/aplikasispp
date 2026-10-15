@@ -9,7 +9,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
   try {
-    const { jenis_tagihan, bulan_tagihan, tahun, userId } = await request.json();
+    const { jenis_tagihan, bulan_tagihan, tahun, userId, target_type, target_id, target_label } = await request.json();
     
     if (!jenis_tagihan || !bulan_tagihan) {
       return NextResponse.json({ success: false, error: 'Jenis tagihan dan bulan tagihan harus diisi' }, { status: 400 });
@@ -21,6 +21,25 @@ export async function POST(request: Request) {
       .delete()
       .eq('jenis_tagihan', jenis_tagihan)
       .eq('status', 'Belum Lunas');
+
+    if (target_type === 'student' && target_id) {
+      deleteQuery = deleteQuery.eq('student_id', target_id);
+    } else if (target_type === 'class' && target_id) {
+      const { data: classStudents, error: classStudentsErr } = await supabaseAdmin
+        .from('students')
+        .select('id')
+        .eq('class_id', target_id);
+
+      if (classStudentsErr) {
+        throw new Error(classStudentsErr.message);
+      }
+
+      const studentIds = (classStudents || []).map((s: any) => s.id);
+      if (studentIds.length === 0) {
+        return NextResponse.json({ success: true, message: 'Tidak ada siswa di kelas tersebut', count: 0 });
+      }
+      deleteQuery = deleteQuery.in('student_id', studentIds);
+    }
       
     if (bulan_tagihan === 'all') {
       if (!tahun) return NextResponse.json({ success: false, error: 'Tahun harus diisi' }, { status: 400 });
@@ -54,12 +73,18 @@ export async function POST(request: Request) {
           .eq('action', 'DELETE');
       }
 
+      const targetDesc = target_type === 'student'
+        ? ` (Siswa: ${target_label || target_id})`
+        : target_type === 'class'
+        ? ` (Kelas: ${target_label || target_id})`
+        : ' (Semua Siswa)';
+
       await insertAuditLog(
         supabaseAdmin, 
         userId, 
         "Hapus Tagihan Masal", 
         "student_bills", 
-        `Menghapus ${count} tagihan ${jenis_tagihan} untuk ${bulan_tagihan === 'all' ? `Tahun ${tahun}` : bulan_tagihan}`
+        `Menghapus ${count} tagihan ${jenis_tagihan}${targetDesc} untuk ${bulan_tagihan === 'all' ? `Tahun ${tahun}` : bulan_tagihan}`
       );
     }
 
